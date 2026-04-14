@@ -1,399 +1,502 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>備品一覧 — OCEANS</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥</text></svg>">
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>OCEANS — 備品管理</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
   <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-    button { font-family: inherit; }
-    a { text-decoration: none; }
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    html,body{height:100%;overflow:hidden}
+    body{font-family:'Outfit',-apple-system,'Hiragino Sans','Noto Sans JP',sans-serif;-webkit-font-smoothing:antialiased;background:#F0F6FF}
+    button{font-family:inherit;cursor:pointer}
+    a{text-decoration:none}
+    ::-webkit-scrollbar{width:5px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(59,130,246,0.15);border-radius:3px}
 
-    @keyframes floatOrb1 {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      33% { transform: translate(-30px, 40px) scale(1.1); }
-      66% { transform: translate(20px, -20px) scale(0.95); }
-    }
-    @keyframes floatOrb2 {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      33% { transform: translate(40px, -30px) scale(1.05); }
-      66% { transform: translate(-20px, 30px) scale(0.9); }
-    }
-    @keyframes floatOrb3 {
-      0%, 100% { transform: translate(0, 0); }
-      50% { transform: translate(-40px, 20px); }
-    }
+    @keyframes rippleOut{0%{transform:scale(0);opacity:0.5}100%{transform:scale(4);opacity:0}}
+    @keyframes fadeSlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes gentleSway{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(1deg)}}
 
-    @media (max-width: 600px) {
-      .stats-row { flex-direction: column !important; }
-      .hero-title { font-size: 34px !important; }
-      .filter-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .ripple-container{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none}
+    .ripple{position:absolute;border-radius:50%;background:rgba(59,130,246,0.12);animation:rippleOut 0.6s ease-out forwards;width:80px;height:80px;margin:-40px}
+
+    .drag-handle{cursor:grab;opacity:0.25;transition:opacity 0.2s,transform 0.2s}
+    .drag-handle:hover{opacity:0.5;transform:scale(1.15)}
+    .drag-handle:active{cursor:grabbing}
+
+    @media(max-width:768px){
+      .app-layout{flex-direction:column!important}
+      .sidebar{width:100%!important;height:auto!important;border-right:none!important;border-bottom:1px solid #E8F0FE!important;padding:16px!important}
+      .sb-members{flex-direction:row!important;overflow-x:auto!important}
+      .main-content{height:auto!important;min-height:60vh}
     }
   </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useRef,useMemo,useCallback}=React;
 
-    /* ═══════════ SVG Icons ═══════════ */
-    const Icons = {
-      Laptop: ({ size = 22, color, style }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={style}>
-          <path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/>
-        </svg>
-      ),
-      Monitor: ({ size = 22, color, style }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={style}>
-          <rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>
-        </svg>
-      ),
-      Keyboard: ({ size = 22, color, style }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={style}>
-          <rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"/>
-        </svg>
-      ),
-      Mouse: ({ size = 22, color, style }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={style}>
-          <rect width="12" height="18" x="6" y="3" rx="6"/><path d="M12 7v4"/>
-        </svg>
-      ),
-      Stand: ({ size = 22, color, style }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={style}>
-          <rect width="18" height="12" x="3" y="3" rx="2"/><path d="M12 15v4M8 19h8"/>
-        </svg>
-      ),
-      Grip: ({ size = 22, color, style }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={style}>
-          <circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="5" r="1"/>
-          <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
-          <circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/><circle cx="5" cy="19" r="1"/>
-        </svg>
-      ),
-      ArrowUpRight: ({ size = 12, color, style }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={style}>
-          <path d="M7 7h10v10M7 17 17 7"/>
-        </svg>
-      ),
-      Users: ({ size = 11, color, style }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
-          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-        </svg>
-      ),
-      Layers: ({ size = 11, color, style }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
-          <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 12-8.58 4.08a2 2 0 0 1-1.66 0L2 12M22 17l-8.58 4.08a2 2 0 0 1-1.66 0L2 17"/>
-        </svg>
-      ),
-      Package: ({ size = 11, color, style }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
-          <path d="m7.5 4.27 9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/>
-        </svg>
-      ),
-    };
+/* ═══ Icons ═══ */
+const I={
+  Laptop:(p)=><svg width={p.s||22} height={p.s||22} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/></svg>,
+  Monitor:(p)=><svg width={p.s||22} height={p.s||22} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>,
+  Keyboard:(p)=><svg width={p.s||22} height={p.s||22} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"/></svg>,
+  Mouse:(p)=><svg width={p.s||22} height={p.s||22} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="12" height="18" x="6" y="3" rx="6"/><path d="M12 7v4"/></svg>,
+  Stand:(p)=><svg width={p.s||22} height={p.s||22} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="12" x="3" y="3" rx="2"/><path d="M12 15v4M8 19h8"/></svg>,
+  Grip:(p)=><svg width={p.s||22} height={p.s||22} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/><circle cx="5" cy="19" r="1"/></svg>,
+  Arrow:(p)=><svg width={p.s||11} height={p.s||11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 7h10v10M7 17 17 7"/></svg>,
+  Anchor:(p)=><svg width={p.s||18} height={p.s||18} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="3"/><line x1="12" x2="12" y1="8" y2="21"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/></svg>,
+  User:(p)=><svg width={p.s||10} height={p.s||10} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  Users:(p)=><svg width={p.s||13} height={p.s||13} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  DragDots:(p)=><svg width={p.s||16} height={p.s||16} viewBox="0 0 24 24" fill={p.c||"#CBD5E1"} stroke="none"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>,
+};
+const icoMap={Laptop:I.Laptop,Monitor:I.Monitor,Keyboard:I.Keyboard,Mouse:I.Mouse,Stand:I.Stand,Grip:I.Grip};
 
-    /* ═══════════ Data ═══════════ */
-    const equipmentData = [
-      { id: 1, name: "MacBook Pro M5", sub: '14" / 32GB / 1TB SSD', brand: "Apple", category: "PC", color: "#6366F1", url: "https://amzn.asia/d/092PHwjt", icon: "Laptop", finish: "スペースブラック", user: "中植" },
-      { id: 2, name: "S2722DC モニター", sub: '27" QHD / IPS / USB-C', brand: "Dell", category: "モニター", color: "#10B981", url: "https://amzn.asia/d/huZo4Am", icon: "Monitor", finish: "75Hz / スピーカー付", user: "中植" },
-      { id: 3, name: "PCスタンド 回転式", sub: "360° / 折りたたみ / 無段階調整", brand: "EPN", category: "スタンド", color: "#F59E0B", url: "https://amzn.asia/d/01dfglW4", icon: "Stand", finish: "人間工学設計", user: "中植" },
-      { id: 4, name: "MX KEYS mini", sub: "Bluetooth / 充電式 / 日本語配列", brand: "Logicool", category: "キーボード", color: "#EC4899", url: "https://amzn.asia/d/gRjAFMU", icon: "Keyboard", finish: "グラファイト", user: "中植" },
-      { id: 5, name: "MX ERGO S", sub: "トラックボール / 静音 / BT", brand: "Logicool", category: "マウス", color: "#8B5CF6", url: "https://amzn.asia/d/fzFRgbs", icon: "Mouse", finish: "グラファイト", user: "中植" },
-      { id: 6, name: "モニターアーム", sub: '13-32" / ガススプリング / VESA', brand: "—", category: "アーム", color: "#06B6D4", url: "https://amzn.asia/d/0wfmNV4", icon: "Grip", finish: "シングル", user: "中植" },
-    ];
+/* ═══ Data ═══ */
+const initData=[
+  {id:1,name:"MacBook Pro M4",sub:'14" / 32GB / 1TB SSD',brand:"Apple",category:"PC",color:"#3B82F6",url:"https://amzn.asia/d/092PHwjt",icon:"Laptop",finish:"スペースブラック",user:"中植"},
+  {id:2,name:"S2722DC モニター",sub:'27" QHD / IPS / USB-C',brand:"Dell",category:"モニター",color:"#10B981",url:"https://amzn.asia/d/huZo4Am",icon:"Monitor",finish:"75Hz / スピーカー付",user:"中植"},
+  {id:3,name:"PCスタンド 回転式",sub:"360° / 折りたたみ / 無段階調整",brand:"EPN",category:"スタンド",color:"#F59E0B",url:"https://amzn.asia/d/01dfglW4",icon:"Stand",finish:"人間工学設計",user:"中植"},
+  {id:4,name:"MX KEYS mini",sub:"Bluetooth / 充電式 / 日本語配列",brand:"Logicool",category:"キーボード",color:"#EC4899",url:"https://amzn.asia/d/gRjAFMU",icon:"Keyboard",finish:"グラファイト",user:"中植"},
+  {id:5,name:"MX ERGO S",sub:"トラックボール / 静音 / BT",brand:"Logicool",category:"マウス",color:"#8B5CF6",url:"https://amzn.asia/d/fzFRgbs",icon:"Mouse",finish:"グラファイト",user:"中植"},
+  {id:6,name:"モニターアーム",sub:'13-32" / ガススプリング / VESA',brand:"—",category:"アーム",color:"#06B6D4",url:"https://amzn.asia/d/0wfmNV4",icon:"Grip",finish:"シングル",user:"中植"},
+];
 
-    const allCategories = ["すべて", ...Array.from(new Set(equipmentData.map(e => e.category)))];
-    const allUsers = Array.from(new Set(equipmentData.map(e => e.user)));
+const cats=["すべて",...Array.from(new Set(initData.map(e=>e.category)))];
+const users=Array.from(new Set(initData.filter(e=>e.user).map(e=>e.user)));
+const unusedN=initData.filter(e=>!e.user).length;
+const ucMap={"中植":"#3B82F6","畑山":"#10B981","田中":"#8B5CF6","山本":"#F59E0B","佐藤":"#EC4899","鈴木":"#06B6D4"};
+function uc(name){return ucMap[name]||"#3B82F6"}
 
-    /* ═══════════ Card ═══════════ */
-    function Card({ item, index, isVisible }) {
-      const [hovered, setHovered] = useState(false);
-      const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
-      const cardRef = useRef(null);
-      const IconComp = Icons[item.icon];
+/* ═══ Ripple ═══ */
+function useRipple(){
+  const[rips,setRips]=useState([]);
+  const add=useCallback((e,el)=>{
+    const r=el.getBoundingClientRect();
+    const rip={x:e.clientX-r.left,y:e.clientY-r.top,id:Date.now()};
+    setRips(p=>[...p,rip]);
+    setTimeout(()=>setRips(p=>p.filter(r2=>r2.id!==rip.id)),600);
+  },[]);
+  const R=()=>React.createElement("div",{className:"ripple-container"},
+    rips.map(r=>React.createElement("div",{key:r.id,className:"ripple",style:{left:r.x,top:r.y}}))
+  );
+  return{add,R};
+}
 
-      const handleMouseMove = (e) => {
-        if (!cardRef.current) return;
-        const rect = cardRef.current.getBoundingClientRect();
-        setMousePos({
-          x: ((e.clientX - rect.left) / rect.width) * 100,
-          y: ((e.clientY - rect.top) / rect.height) * 100,
-        });
-      };
+/* ═══ Wave ═══ */
+function WaveDecoration(){
+  return(
+    <div style={{position:"absolute",bottom:0,left:0,right:0,height:190,overflow:"hidden",pointerEvents:"none"}}>
+      <svg viewBox="0 0 480 190" preserveAspectRatio="none" style={{width:"100%",height:"100%",position:"absolute",bottom:0}}>
+        <path fill="#DBEAFE" opacity="0.25">
+          <animate attributeName="d" dur="10s" repeatCount="indefinite" values="M0 48Q60 40 120 46T240 42T360 48T480 40V190H0Z;M0 42Q60 48 120 40T240 46T360 42T480 48V190H0Z;M0 48Q60 40 120 46T240 42T360 48T480 40V190H0Z"/>
+        </path>
+        <path fill="#BFDBFE" opacity="0.35">
+          <animate attributeName="d" dur="7s" repeatCount="indefinite" values="M0 68Q60 60 120 66T240 62T360 68T480 60V190H0Z;M0 62Q60 68 120 60T240 66T360 62T480 68V190H0Z;M0 68Q60 60 120 66T240 62T360 68T480 60V190H0Z"/>
+        </path>
+        <path fill="#93C5FD" opacity="0.2">
+          <animate attributeName="d" dur="5s" repeatCount="indefinite" values="M0 90Q60 84 120 88T240 85T360 90T480 84V190H0Z;M0 85Q60 90 120 84T240 88T360 85T480 90V190H0Z;M0 90Q60 84 120 88T240 85T360 90T480 84V190H0Z"/>
+        </path>
+        <rect y="120" width="480" height="70" fill="#BFDBFE" opacity="0.15"/>
+      </svg>
+    </div>
+  );
+}
 
-      return (
-        <div
-          ref={cardRef}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-          onMouseMove={handleMouseMove}
+/* ═══ Card ═══ */
+function Card({item,index,isVisible,isDragging,dragStyle,onDragStart,onDragEnter,onDragEnd}){
+  const[h,setH]=useState(false);
+  const[mp,setMp]=useState({x:50,y:50});
+  const[pressed,setPressed]=useState(false);
+  const ref=useRef(null);
+  const{add,R}=useRipple();
+  const Ico=icoMap[item.icon];
+  const un=!item.user;
+  const userColor=item.user?uc(item.user):"#CBD5E1";
+
+  return(
+    <div ref={ref}
+      onDragEnter={onDragEnter}
+      onMouseEnter={()=>setH(true)} onMouseLeave={()=>{setH(false);setPressed(false)}}
+      onMouseDown={e=>{if(!e.target.closest('.drag-handle')){setPressed(true);add(e,ref.current)}}}
+      onMouseUp={()=>setPressed(false)}
+      onMouseMove={e=>{if(!ref.current)return;const r=ref.current.getBoundingClientRect();setMp({x:((e.clientX-r.left)/r.width)*100,y:((e.clientY-r.top)/r.height)*100});}}
+      style={{
+        position:"relative",borderRadius:18,padding:"22px 8px 22px 4px",
+        background:isDragging?"rgba(219,234,254,0.9)":(un?(h?"rgba(255,255,255,0.65)":"rgba(255,255,255,0.4)"):(h?"#FFFFFF":"rgba(255,255,255,0.85)")),
+        border:isDragging?"2px solid #93C5FD":(un?("1.5px dashed "+(h?"#CBD5E1":"#E2E8F0")):("1px solid "+(h?"rgba(59,130,246,0.15)":"rgba(0,0,0,0.04)"))),
+        boxShadow:isDragging?"0 20px 50px -10px rgba(59,130,246,0.25), 0 8px 20px rgba(0,0,0,0.08)":(h&&!un?"0 12px 40px -8px rgba(59,130,246,0.1), 0 4px 12px rgba(0,0,0,0.03)":"0 1px 3px rgba(0,0,0,0.02)"),
+        opacity:isVisible?(isDragging?0.9:(un?0.65:1)):0,
+        transform:isVisible?(isDragging?"scale(1.02) rotate(0.5deg)":(pressed?"scale(0.985)":(h?"translateY(-3px)":"translateY(0)"))):"translateY(24px) scale(0.98)",
+        transition:isDragging?"box-shadow 0.2s":(pressed?"transform 0.1s":"all 0.55s cubic-bezier(0.34,1.56,0.64,1) "+(index*0.06)+"s"),
+        cursor:"default",overflow:"hidden",
+        zIndex:isDragging?100:1,
+        ...dragStyle,
+      }}
+    >
+      <R/>
+      {!un&&!isDragging&&<div style={{
+        position:"absolute",inset:0,borderRadius:18,opacity:h?0.06:0,
+        background:"radial-gradient(450px circle at "+mp.x+"% "+mp.y+"%, "+item.color+", transparent 60%)",
+        transition:"opacity 0.4s",pointerEvents:"none",
+      }}/>}
+
+      <div style={{position:"relative",zIndex:1,display:"flex",alignItems:"flex-start",gap:8}}>
+        {/* Drag Handle */}
+        <div className="drag-handle"
+          draggable
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
           style={{
-            position: "relative", borderRadius: 20, padding: "28px 28px 24px",
-            background: hovered ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.72)",
-            backdropFilter: "blur(40px) saturate(180%)", WebkitBackdropFilter: "blur(40px) saturate(180%)",
-            border: "1px solid " + (hovered ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)"),
-            boxShadow: hovered
-              ? "0 20px 60px -10px " + item.color + "18, 0 8px 24px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8)"
-              : "0 2px 12px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.5)",
-            cursor: "default", overflow: "hidden",
-            opacity: isVisible ? 1 : 0,
-            transform: isVisible ? (hovered ? "translateY(-2px) scale(1.005)" : "translateY(0) scale(1)") : "translateY(30px) scale(0.97)",
-            transition: "all 0.7s cubic-bezier(0.16, 1, 0.3, 1) " + (index * 0.08) + "s",
-            willChange: "transform, opacity, box-shadow",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            width:24,minHeight:46,flexShrink:0,
+            alignSelf:"center",
+            touchAction:"none",
           }}
         >
-          <div style={{
-            position: "absolute", inset: 0, borderRadius: 20,
-            opacity: hovered ? 0.07 : 0,
-            background: "radial-gradient(600px circle at " + mousePos.x + "% " + mousePos.y + "%, " + item.color + ", transparent 50%)",
-            transition: "opacity 0.4s ease", pointerEvents: "none",
-          }} />
-
-          <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "flex-start", gap: 20 }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: 14,
-              background: "linear-gradient(135deg, " + item.color + "12, " + item.color + "06)",
-              border: "1px solid " + item.color + "18",
-              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-              transition: "all 0.5s cubic-bezier(0.16, 1, 0.3, 1)",
-              transform: hovered ? "scale(1.08)" : "scale(1)",
-            }}>
-              <IconComp size={22} color={item.color} style={{ transition: "all 0.4s ease", opacity: hovered ? 1 : 0.7 }} />
-            </div>
-
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 17, fontWeight: 600, color: "#1D1D1F", letterSpacing: "-0.025em", lineHeight: 1.2 }}>{item.name}</span>
-                <span style={{
-                  fontSize: 10, fontWeight: 600, color: item.color,
-                  background: item.color + "0D", padding: "3px 9px", borderRadius: 99,
-                  letterSpacing: "0.04em", flexShrink: 0, border: "1px solid " + item.color + "15",
-                }}>{item.category}</span>
-              </div>
-              <p style={{ fontSize: 13, color: "#86868B", margin: "0 0 4px", letterSpacing: "-0.01em", lineHeight: 1.5 }}>
-                <span style={{ color: "#6E6E73", fontWeight: 500 }}>{item.brand}</span>
-                <span style={{ margin: "0 7px", color: "#D2D2D7" }}>·</span>{item.sub}
-              </p>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <p style={{ fontSize: 12, color: "#AEAEB2", margin: 0 }}>{item.finish}</p>
-                <span style={{ fontSize: 10.5, color: "#86868B", fontWeight: 500, background: "rgba(0,0,0,0.03)", padding: "2px 8px", borderRadius: 6 }}>{item.user}</span>
-              </div>
-            </div>
-
-            <a href={item.url} target="_blank" rel="noopener noreferrer"
-              style={{
-                display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 500,
-                color: hovered ? "#1D1D1F" : "#AEAEB2", padding: "7px 12px", borderRadius: 10,
-                background: hovered ? "rgba(0,0,0,0.04)" : "transparent",
-                transition: "all 0.3s ease", flexShrink: 0, marginTop: 2,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = item.color + "12"; e.currentTarget.style.color = item.color; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = hovered ? "rgba(0,0,0,0.04)" : "transparent"; e.currentTarget.style.color = hovered ? "#1D1D1F" : "#AEAEB2"; }}
-            >
-              Amazon<Icons.ArrowUpRight size={12} />
-            </a>
-          </div>
+          <I.DragDots s={14} c={isDragging?"#3B82F6":"#CBD5E1"}/>
         </div>
-      );
-    }
 
-    /* ═══════════ FilterPill ═══════════ */
-    function FilterPill({ label, isActive, onClick }) {
-      const [hovered, setHovered] = useState(false);
-      return (
-        <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-          style={{
-            padding: "7px 18px", borderRadius: 99, border: "none",
-            background: isActive ? "#1D1D1F" : hovered ? "rgba(0,0,0,0.05)" : "transparent",
-            color: isActive ? "#FFFFFF" : hovered ? "#1D1D1F" : "#86868B",
-            fontSize: 13, fontWeight: isActive ? 500 : 400, cursor: "pointer",
-            transition: "all 0.35s cubic-bezier(0.16, 1, 0.3, 1)", letterSpacing: "-0.01em",
-            transform: isActive ? "scale(1)" : hovered ? "scale(1.03)" : "scale(1)",
-            whiteSpace: "nowrap",
-          }}
-        >{label}</button>
-      );
-    }
-
-    /* ═══════════ AnimatedNumber ═══════════ */
-    function AnimatedNumber({ value, delay = 0 }) {
-      const [display, setDisplay] = useState(0);
-      useEffect(() => {
-        const timer = setTimeout(() => {
-          const duration = 800; const startTime = Date.now();
-          const animate = () => {
-            const p = Math.min((Date.now() - startTime) / duration, 1);
-            setDisplay(Math.round((1 - Math.pow(1 - p, 3)) * value));
-            if (p < 1) requestAnimationFrame(animate);
-          };
-          animate();
-        }, delay);
-        return () => clearTimeout(timer);
-      }, [value, delay]);
-      return React.createElement("span", null, display);
-    }
-
-    /* ═══════════ App ═══════════ */
-    function App() {
-      const [filter, setFilter] = useState("すべて");
-      const [userFilter, setUserFilter] = useState("すべて");
-      const [loaded, setLoaded] = useState(false);
-      const [headerVisible, setHeaderVisible] = useState(false);
-
-      useEffect(() => {
-        const t1 = setTimeout(() => setHeaderVisible(true), 100);
-        const t2 = setTimeout(() => setLoaded(true), 400);
-        return () => { clearTimeout(t1); clearTimeout(t2); };
-      }, []);
-
-      let filtered = equipmentData;
-      if (filter !== "すべて") filtered = filtered.filter(e => e.category === filter);
-      if (userFilter !== "すべて") filtered = filtered.filter(e => e.user === userFilter);
-
-      const categoryCount = new Set(equipmentData.map(e => e.category)).size;
-      const userFilterOptions = ["すべて", ...allUsers];
-
-      return (
+        {/* Icon */}
         <div style={{
-          minHeight: "100vh",
-          background: "linear-gradient(180deg, #F5F5F7 0%, #ECECEE 50%, #E8E8ED 100%)",
-          position: "relative", overflow: "hidden",
+          width:46,height:46,borderRadius:13,flexShrink:0,
+          background:un?"#F8FAFC":"linear-gradient(135deg,"+item.color+"10,"+item.color+"05)",
+          border:un?"1px dashed #E2E8F0":"1px solid "+item.color+"18",
+          display:"flex",alignItems:"center",justifyContent:"center",
+          transition:"all 0.4s cubic-bezier(0.34,1.56,0.64,1)",
+          transform:h&&!isDragging?"scale(1.1) rotate(-3deg)":"scale(1) rotate(0)",
         }}>
-          <div style={{
-            position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
-            opacity: headerVisible ? 0.5 : 0, transition: "opacity 2s ease",
-          }}>
-            <div style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)", top: "-10%", right: "5%", animation: "floatOrb1 20s ease-in-out infinite" }} />
-            <div style={{ position: "absolute", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,0.06) 0%, transparent 70%)", bottom: "10%", left: "-5%", animation: "floatOrb2 25s ease-in-out infinite" }} />
-            <div style={{ position: "absolute", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(236,72,153,0.05) 0%, transparent 70%)", top: "40%", right: "20%", animation: "floatOrb3 18s ease-in-out infinite" }} />
+          <Ico s={20} c={un?"#CBD5E1":item.color} style={{opacity:un?0.4:(h?1:0.65),transition:"all 0.3s"}}/>
+        </div>
+
+        {/* Content */}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+            <span style={{fontSize:15.5,fontWeight:600,color:un?"#94A3B8":"#1E293B",letterSpacing:"-0.02em"}}>{item.name}</span>
+            <span style={{
+              fontSize:9.5,fontWeight:600,letterSpacing:"0.04em",
+              color:un?"#94A3B8":item.color,
+              background:un?"#F1F5F9":(item.color+"0C"),
+              padding:"2px 8px",borderRadius:99,
+              border:"1px solid "+(un?"#E2E8F0":(item.color+"18")),
+            }}>{item.category}</span>
           </div>
-
-          <div style={{ position: "relative", zIndex: 1, maxWidth: 760, margin: "0 auto", padding: "0 24px" }}>
-            {/* Hero */}
-            <div style={{
-              paddingTop: 72, paddingBottom: 24,
-              opacity: headerVisible ? 1 : 0,
-              transform: headerVisible ? "translateY(0)" : "translateY(20px)",
-              transition: "all 1s cubic-bezier(0.16, 1, 0.3, 1)",
-            }}>
-              <h1 className="hero-title" style={{ fontSize: 44, fontWeight: 700, color: "#1D1D1F", letterSpacing: "-0.04em", lineHeight: 1.1, margin: "0 0 8px" }}>
-                備品一覧
-              </h1>
-              <p style={{ fontSize: 18, color: "#86868B", fontWeight: 400, margin: 0, letterSpacing: "-0.02em" }}>
-                OCEANS — 個人配布備品の管理
-              </p>
-            </div>
-
-            {/* Stats */}
-            <div className="stats-row" style={{
-              display: "flex", gap: 12, marginBottom: 36,
-              opacity: headerVisible ? 1 : 0,
-              transform: headerVisible ? "translateY(0)" : "translateY(16px)",
-              transition: "all 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.15s",
-            }}>
-              {[
-                { label: "メンバー", value: allUsers.length, icon: Icons.Users },
-                { label: "アイテム", value: equipmentData.length, icon: Icons.Package },
-                { label: "カテゴリ", value: categoryCount, icon: Icons.Layers },
-              ].map((stat, i) => (
-                <div key={stat.label} style={{
-                  flex: "1 1 140px", minWidth: 140,
-                  background: "rgba(255,255,255,0.6)",
-                  backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
-                  borderRadius: 16, padding: "18px 20px",
-                  border: "1px solid rgba(255,255,255,0.6)",
-                  boxShadow: "0 1px 4px rgba(0,0,0,0.02)",
-                }}>
-                  <div style={{
-                    fontSize: 11, color: "#AEAEB2", fontWeight: 500,
-                    letterSpacing: "0.02em", textTransform: "uppercase",
-                    marginBottom: 6, display: "flex", alignItems: "center", gap: 5,
-                  }}>
-                    {stat.icon && <stat.icon size={11} />}
-                    {stat.label}
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 600, color: "#1D1D1F", letterSpacing: "-0.03em" }}>
-                    <AnimatedNumber value={stat.value} delay={600 + i * 200} />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Filters */}
-            <div style={{
-              display: "flex", flexDirection: "column", gap: 10, marginBottom: 24,
-              opacity: headerVisible ? 1 : 0,
-              transform: headerVisible ? "translateY(0)" : "translateY(12px)",
-              transition: "all 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.25s",
-            }}>
-              <div className="filter-bar" style={{
-                display: "flex", gap: 4, padding: "4px",
-                background: "rgba(255,255,255,0.45)",
-                backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
-                borderRadius: 99, border: "1px solid rgba(255,255,255,0.5)",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.02)", width: "fit-content",
-              }}>
-                {allCategories.map(cat => (
-                  <FilterPill key={cat} label={cat} isActive={filter === cat} onClick={() => setFilter(cat)} />
-                ))}
-              </div>
-
-              {allUsers.length > 1 && (
-                <div className="filter-bar" style={{
-                  display: "flex", gap: 4, padding: "4px",
-                  background: "rgba(255,255,255,0.35)",
-                  borderRadius: 99, border: "1px solid rgba(255,255,255,0.4)",
-                  width: "fit-content",
-                }}>
-                  {userFilterOptions.map(u => (
-                    <FilterPill key={u} label={u} isActive={userFilter === u} onClick={() => setUserFilter(u)} />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={{
-              fontSize: 13, color: "#AEAEB2", marginBottom: 16, paddingLeft: 4,
-              opacity: headerVisible ? 1 : 0, transition: "opacity 0.6s ease 0.4s",
-            }}>
-              {filtered.length} 件{filter !== "すべて" ? " — " + filter : ""}{userFilter !== "すべて" ? " · " + userFilter : ""}
-            </div>
-
-            {/* Cards */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 60 }}>
-              {filtered.map((item, i) => (
-                <Card key={item.id} item={item} index={i} isVisible={loaded} />
-              ))}
-              {filtered.length === 0 && (
-                <div style={{ textAlign: "center", padding: "60px 20px", color: "#AEAEB2", fontSize: 14 }}>
-                  該当する備品がありません
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div style={{
-              textAlign: "center", paddingBottom: 48,
-              opacity: loaded ? 0.4 : 0, transition: "opacity 1s ease 1s",
-            }}>
-              <div style={{ width: 32, height: 1, background: "#C7C7CC", margin: "0 auto 14px" }} />
-              <p style={{ fontSize: 11, color: "#AEAEB2", letterSpacing: "0.02em" }}>最終更新 2026.04.14</p>
-            </div>
+          <p style={{fontSize:12.5,color:un?"#CBD5E1":"#64748B",margin:"0 0 3px",lineHeight:1.5}}>
+            <span style={{fontWeight:500,color:un?"#94A3B8":"#475569"}}>{item.brand}</span>
+            <span style={{margin:"0 6px",color:"#E2E8F0"}}>·</span>{item.sub}
+          </p>
+          <div style={{display:"flex",alignItems:"center",gap:7}}>
+            <span style={{fontSize:11,color:un?"#CBD5E1":"#94A3B8"}}>{item.finish}</span>
+            {item.user?(
+              <span style={{
+                display:"inline-flex",alignItems:"center",gap:3,
+                fontSize:10,fontWeight:600,color:userColor,
+                background:userColor+"0A",padding:"2px 8px 2px 5px",borderRadius:99,
+                border:"1px solid "+userColor+"15",
+              }}><I.User s={8} c={userColor}/>{item.user}</span>
+            ):(
+              <span style={{fontSize:10,fontWeight:500,color:"#94A3B8",background:"#F8FAFC",padding:"2px 8px",borderRadius:99,border:"1px dashed #E2E8F0"}}>未使用</span>
+            )}
           </div>
         </div>
-      );
-    }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-  </script>
+        {/* Amazon */}
+        <a href={item.url} target="_blank" rel="noopener noreferrer"
+          onClick={e=>isDragging&&e.preventDefault()}
+          style={{
+            display:"flex",alignItems:"center",gap:3,fontSize:11,fontWeight:500,
+            color:h?"#3B82F6":"#C0C8D4",padding:"6px 10px",borderRadius:9,
+            background:h?"rgba(59,130,246,0.06)":"transparent",
+            transition:"all 0.3s",flexShrink:0,marginTop:2,
+          }}
+          onMouseEnter={e=>{e.currentTarget.style.background="rgba(59,130,246,0.1)";e.currentTarget.style.color="#2563EB";e.currentTarget.style.transform="translateX(2px)";}}
+          onMouseLeave={e=>{e.currentTarget.style.background=h?"rgba(59,130,246,0.06)":"transparent";e.currentTarget.style.color=h?"#3B82F6":"#C0C8D4";e.currentTarget.style.transform="translateX(0)";}}
+        >Amazon<I.Arrow/></a>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ Pill ═══ */
+function Pill({label,active,onClick,count}){
+  const[h,setH]=useState(false);
+  const[clicked,setClicked]=useState(false);
+  return(
+    <button onClick={()=>{setClicked(true);setTimeout(()=>setClicked(false),200);onClick()}}
+      onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
+      style={{
+        padding:"6px 14px",borderRadius:99,
+        border:active?"1px solid rgba(59,130,246,0.25)":"1px solid transparent",
+        background:active?"#3B82F6":h?"rgba(59,130,246,0.06)":"transparent",
+        color:active?"#FFF":h?"#3B82F6":"#64748B",
+        fontSize:12,fontWeight:active?600:400,
+        transition:clicked?"transform 0.1s":"all 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+        whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:4,
+        transform:clicked?"scale(0.92)":"scale(1)",
+      }}
+    >
+      {label}
+      {count!==undefined&&count>0&&(
+        <span style={{fontSize:9,fontWeight:600,background:active?"rgba(255,255,255,0.25)":"rgba(59,130,246,0.08)",color:active?"#FFF":"#64748B",padding:"1px 5px",borderRadius:99,minWidth:16,textAlign:"center"}}>{count}</span>
+      )}
+    </button>
+  );
+}
+
+/* ═══ SbMember ═══ */
+function SbMember({name,count,active,onClick,isDragging,onDragStart,onDragEnter,draggable}){
+  const[h,setH]=useState(false);
+  const[cl,setCl]=useState(false);
+  const colors=["#3B82F6","#10B981","#F59E0B","#EC4899","#8B5CF6","#06B6D4","#EF4444","#14B8A6"];
+  const c=colors[Math.abs([...name].reduce((a,ch)=>a+ch.charCodeAt(0),0))%colors.length];
+  const isAll=name==="全員";
+  return(
+    <div
+      onDragEnter={onDragEnter}
+      style={{
+        display:"flex",alignItems:"center",width:"100%",
+        borderRadius:12,
+        opacity:isDragging?0.5:1,
+        background:isDragging?"rgba(59,130,246,0.06)":(active?"rgba(59,130,246,0.06)":h?"rgba(0,0,0,0.02)":"transparent"),
+        transition:cl?"transform 0.1s":"all 0.25s ease",
+        transform:cl?"scale(0.96)":"scale(1)",
+      }}
+    >
+      {/* Drag handle for non-全員 */}
+      {!isAll&&draggable?(
+        <div draggable onDragStart={onDragStart}
+          className="drag-handle"
+          style={{display:"flex",alignItems:"center",justifyContent:"center",width:20,flexShrink:0,padding:"8px 0 8px 6px",alignSelf:"stretch",cursor:"grab"}}>
+          <I.DragDots s={10} c={isDragging?"#3B82F6":"#D4D4D8"}/>
+        </div>
+      ):(
+        <div style={{width:8,flexShrink:0}}/>
+      )}
+      <button onClick={()=>{setCl(true);setTimeout(()=>setCl(false),200);onClick()}}
+        onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
+        style={{
+          display:"flex",alignItems:"center",gap:10,flex:1,
+          padding:isAll?"9px 12px 9px 4px":"9px 12px 9px 4px",border:"none",
+          background:"transparent",textAlign:"left",cursor:"pointer",
+        }}
+      >
+        <div style={{
+          width:32,height:32,borderRadius:9,flexShrink:0,
+          background:active?(c+"18"):(h?(c+"0C"):(c+"08")),
+          display:"flex",alignItems:"center",justifyContent:"center",
+          fontSize:13,fontWeight:600,color:active?c:(h?c+"CC":c+"88"),
+          transition:"all 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+          transform:h?"scale(1.08)":"scale(1)",
+        }}>{isAll?<I.Users s={14} c={active?"#3B82F6":"#94A3B8"}/>:name.charAt(0)}</div>
+        <span style={{flex:1,fontSize:13,fontWeight:active?600:400,color:active?"#1E293B":h?"#475569":"#94A3B8",transition:"all 0.25s"}}>{name}</span>
+        <span style={{fontSize:11,fontWeight:500,color:active?"#3B82F6":"#CBD5E1"}}>{count}</span>
+      </button>
+    </div>
+  );
+}
+
+/* ═══ App ═══ */
+function App(){
+  const[dataOrder,setDataOrder]=useState(initData.map(d=>d.id));
+  const[memberOrder,setMemberOrder]=useState([...users]);
+  const[selUser,setSelUser]=useState(null);
+  const[catF,setCatF]=useState("すべて");
+  const[statF,setStatF]=useState("すべて");
+  const[loaded,setLoaded]=useState(false);
+  const[dragId,setDragId]=useState(null);
+  const[dragOverItem,setDragOverItem]=useState(null);
+  const[dragMember,setDragMember]=useState(null);
+  const[dragOverMem,setDragOverMem]=useState(null);
+
+  useEffect(()=>{setTimeout(()=>setLoaded(true),200)},[]);
+
+  const orderedData=useMemo(()=>dataOrder.map(id=>initData.find(d=>d.id===id)).filter(Boolean),[dataOrder]);
+  const mCounts=useMemo(()=>{const m={};users.forEach(u=>{m[u]=initData.filter(e=>e.user===u).length});return m},[]);
+
+  let filtered=orderedData;
+  if(selUser)filtered=filtered.filter(e=>e.user===selUser);
+  if(catF!=="すべて")filtered=filtered.filter(e=>e.category===catF);
+  if(statF==="使用中")filtered=filtered.filter(e=>e.user);
+  if(statF==="未使用")filtered=filtered.filter(e=>!e.user);
+
+  const catCounts=useMemo(()=>{
+    const base=selUser?initData.filter(e=>e.user===selUser):initData;
+    const c={};cats.forEach(cat=>{c[cat]=cat==="すべて"?base.length:base.filter(e=>e.category===cat).length});return c;
+  },[selUser]);
+
+  /* Card drag */
+  const handleDragStart=(e,id)=>{setDragId(id);e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",String(id))};
+  const handleDragEnter=(id)=>{if(id!==dragId)setDragOverItem(id)};
+  const handleDragOver=(e)=>{e.preventDefault();e.dataTransfer.dropEffect="move"};
+  const handleDrop=(e)=>{
+    e.preventDefault();
+    if(dragId!==null&&dragOverItem!==null&&dragId!==dragOverItem){
+      setDataOrder(prev=>{const arr=[...prev];const fi=arr.indexOf(dragId);const ti=arr.indexOf(dragOverItem);arr.splice(fi,1);const newTi=fi<ti?ti-1:ti;arr.splice(newTi,0,dragId);return arr});
+    }
+    setDragId(null);setDragOverItem(null);
+  };
+  const handleDragEnd=()=>{setDragId(null);setDragOverItem(null);setDragMember(null);setDragOverMem(null)};
+
+  /* Member drag */
+  const handleMemberDragStart=(e,name)=>{setDragMember(name);e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain","m:"+name)};
+  const handleMemberDragEnter=(name)=>{if(name!==dragMember)setDragOverMem(name)};
+  const handleMemberDrop=(e)=>{
+    e.preventDefault();
+    if(dragMember&&dragOverMem&&dragMember!==dragOverMem){
+      setMemberOrder(prev=>{const arr=[...prev];const fi=arr.indexOf(dragMember);const ti=arr.indexOf(dragOverMem);arr.splice(fi,1);const newTi=fi<ti?ti-1:ti;arr.splice(newTi,0,dragMember);return arr});
+    }
+    setDragMember(null);setDragOverMem(null);
+  };
+
+  /* Reset */
+  const catOrder=cats.slice(1);
+  const resetCardOrder=()=>{
+    const sorted=[...initData].sort((a,b)=>catOrder.indexOf(a.category)-catOrder.indexOf(b.category));
+    setDataOrder(sorted.map(d=>d.id));
+  };
+  const resetMemberOrder=()=>{setMemberOrder([...users].sort((a,b)=>a.localeCompare(b,'ja')))};
+
+  /* Drop indicator component */
+  const DropLine=()=>(
+    <div style={{height:3,borderRadius:2,background:"linear-gradient(90deg,transparent,#3B82F6,#3B82F6,transparent)",margin:"2px 0",animation:"fadeSlideUp 0.15s ease",boxShadow:"0 0 8px rgba(59,130,246,0.3)"}}/>
+  );
+
+  return(
+    <div className="app-layout" style={{display:"flex",height:"100vh",overflow:"hidden",background:"linear-gradient(180deg,#F0F6FF 0%,#E8F1FE 40%,#F0F4FA 100%)"}}>
+
+      {/* ═══ Sidebar ═══ */}
+      <aside className="sidebar" style={{
+        width:250,height:"100vh",position:"relative",
+        background:"rgba(255,255,255,0.7)",
+        backdropFilter:"blur(30px)",WebkitBackdropFilter:"blur(30px)",
+        borderRight:"1px solid rgba(59,130,246,0.08)",
+        display:"flex",flexDirection:"column",padding:"24px 14px 0",flexShrink:0,
+        opacity:loaded?1:0,transform:loaded?"translateX(0)":"translateX(-20px)",
+        transition:"all 0.7s cubic-bezier(0.34,1.56,0.64,1)",
+        overflow:"hidden",
+      }}>
+        <div style={{padding:"0 10px 20px",borderBottom:"1px solid rgba(59,130,246,0.06)",marginBottom:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+            <div style={{animation:"gentleSway 4s ease-in-out infinite"}}><I.Anchor s={20} c="#3B82F6"/></div>
+            <h1 style={{fontSize:22,fontWeight:800,color:"#1E293B",letterSpacing:"-0.03em"}}>OCEANS</h1>
+          </div>
+          <p style={{fontSize:11,color:"#94A3B8",fontWeight:400,letterSpacing:"0.03em",paddingLeft:2}}>備品管理</p>
+        </div>
+
+        <div style={{flex:1,overflow:"auto",paddingBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 12px",marginBottom:8}}>
+            <p style={{fontSize:10,fontWeight:600,color:"#CBD5E1",letterSpacing:"0.08em",textTransform:"uppercase"}}>メンバー</p>
+            <button onClick={resetMemberOrder} style={{fontSize:9.5,color:"#94A3B8",background:"none",border:"none",cursor:"pointer",padding:"2px 6px",borderRadius:4,transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.color="#3B82F6"}}
+              onMouseLeave={e=>{e.currentTarget.style.color="#94A3B8"}}
+            >整理</button>
+          </div>
+          <div className="sb-members" style={{display:"flex",flexDirection:"column",gap:2}}
+            onDragOver={e=>{e.preventDefault();e.dataTransfer.dropEffect="move"}} onDrop={handleMemberDrop}>
+            <SbMember name="全員" count={initData.length} active={!selUser} onClick={()=>setSelUser(null)}/>
+            {memberOrder.map(name=>(
+              <React.Fragment key={name}>
+                {dragMember&&dragOverMem===name&&dragMember!==name&&<DropLine/>}
+                <SbMember name={name} count={mCounts[name]} active={selUser===name} onClick={()=>setSelUser(name)}
+                  draggable isDragging={dragMember===name}
+                  onDragStart={e=>handleMemberDragStart(e,name)}
+                  onDragEnter={()=>handleMemberDragEnter(name)}
+                />
+              </React.Fragment>
+            ))}
+          </div>
+          {unusedN>0&&(
+            <div style={{margin:"16px 4px 0"}}>
+              <button onClick={()=>{setSelUser(null);setStatF(statF==="未使用"?"すべて":"未使用")}}
+                style={{width:"100%",padding:"10px 14px",borderRadius:12,border:statF==="未使用"?"1px solid rgba(245,158,11,0.15)":"1px solid rgba(0,0,0,0.03)",background:statF==="未使用"?"rgba(245,158,11,0.08)":"rgba(0,0,0,0.015)",cursor:"pointer",transition:"all 0.25s",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:12,fontWeight:500,color:statF==="未使用"?"#D97706":"#94A3B8"}}>未使用の備品</span>
+                <span style={{fontSize:12,fontWeight:700,color:statF==="未使用"?"#D97706":"#CBD5E1"}}>{unusedN}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div style={{position:"relative",zIndex:2,padding:"12px 12px 16px",borderTop:"1px solid rgba(59,130,246,0.06)",display:"flex",flexDirection:"column",gap:5,marginBottom:8}}>
+          {[["合計",initData.length],["メンバー",users.length],["更新","2026.04.14"]].map(([k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between"}}>
+              <span style={{fontSize:10.5,color:"#475569"}}>{k}</span>
+              <span style={{fontSize:10.5,fontWeight:600,color:"#334155"}}>{v}</span>
+            </div>
+          ))}
+        </div>
+        <WaveDecoration/>
+      </aside>
+
+      {/* ═══ Main ═══ */}
+      <main className="main-content" style={{flex:1,height:"100vh",overflowY:"auto",overflowX:"hidden",position:"relative"}}
+        onDragOver={handleDragOver} onDrop={handleDrop}
+      >
+        <div style={{maxWidth:720,margin:"0 auto",padding:"0 32px"}}>
+          <div style={{
+            paddingTop:48,paddingBottom:4,
+            opacity:loaded?1:0,transform:loaded?"translateY(0)":"translateY(16px)",
+            transition:"all 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.1s",
+          }}>
+            <h2 style={{fontSize:34,fontWeight:700,color:"#1E293B",letterSpacing:"-0.03em",margin:"0 0 4px",lineHeight:1.15}}>
+              {selUser?selUser+" の備品":"すべての備品"}
+            </h2>
+            <p style={{fontSize:13,color:"#94A3B8",fontWeight:400}}>
+              {selUser?(mCounts[selUser]+" アイテム"):(initData.length+" アイテム · "+users.length+" メンバー")}
+            </p>
+          </div>
+
+          <div style={{
+            display:"flex",flexWrap:"wrap",gap:8,margin:"20px 0 16px",
+            opacity:loaded?1:0,transform:loaded?"translateY(0)":"translateY(10px)",
+            transition:"all 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.2s",
+          }}>
+            <div className="filter-bar" style={{display:"flex",gap:2,padding:"3px",background:"rgba(255,255,255,0.7)",backdropFilter:"blur(20px)",borderRadius:99,border:"1px solid rgba(59,130,246,0.08)"}}>
+              {cats.map(cat=>(<Pill key={cat} label={cat} active={catF===cat} count={cat==="すべて"?undefined:catCounts[cat]} onClick={()=>setCatF(cat)}/>))}
+            </div>
+            <div style={{display:"flex",gap:2,padding:"3px",background:"rgba(255,255,255,0.5)",borderRadius:99,border:"1px solid rgba(0,0,0,0.03)"}}>
+              {["すべて","使用中","未使用"].map(s=>(<Pill key={s} label={s} active={statF===s} onClick={()=>setStatF(s)}/>))}
+            </div>
+          </div>
+
+          <div style={{fontSize:12,color:"#94A3B8",marginBottom:12,paddingLeft:2,opacity:loaded?1:0,transition:"opacity 0.5s 0.35s",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span>{filtered.length} 件表示{dragId!==null&&" · ドラッグで並び替え中"}</span>
+            <button onClick={resetCardOrder} style={{fontSize:10.5,color:"#3B82F6",background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.15)",borderRadius:8,padding:"4px 12px",cursor:"pointer",transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(59,130,246,0.12)";e.currentTarget.style.borderColor="rgba(59,130,246,0.25)"}}
+              onMouseLeave={e=>{e.currentTarget.style.background="rgba(59,130,246,0.06)";e.currentTarget.style.borderColor="rgba(59,130,246,0.15)"}}
+            >並び順を整理</button>
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",gap:8,paddingBottom:60}}>
+            {filtered.map((item,i)=>(
+              <React.Fragment key={item.id}>
+                {dragId!==null&&dragOverItem===item.id&&dragId!==item.id&&<DropLine/>}
+                <Card item={item} index={i} isVisible={loaded}
+                  isDragging={dragId===item.id}
+                  onDragStart={e=>handleDragStart(e,item.id)}
+                  onDragEnter={()=>handleDragEnter(item.id)}
+                  onDragEnd={handleDragEnd}
+                />
+              </React.Fragment>
+            ))}
+            {filtered.length===0&&(
+              <div style={{textAlign:"center",padding:"80px 20px",color:"#CBD5E1",fontSize:14,animation:"fadeSlideUp 0.5s ease"}}>該当する備品がありません</div>
+            )}
+          </div>
+          <div onDragEnd={handleDragEnd} style={{position:"fixed",inset:0,zIndex:-1,pointerEvents:dragId?"auto":"none"}} onDragOver={handleDragOver}/>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
 </body>
 </html>
