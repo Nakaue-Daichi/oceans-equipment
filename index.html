@@ -46,6 +46,7 @@ const{useState,useEffect,useRef,useMemo,useCallback}=React;
 const SHEET_ID="1QlTsEjnTNp1ucQKxt3i2GwGrdWaPGoddEfJqCl4iqKg";
 const CSV_URL=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
 const SHEET_EDIT_URL=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
+const API_URL="https://script.google.com/macros/s/AKfycbxyI7oW6lAshD5AXDid7QtLZnAhiuJQaJxKCILO5WM9J4wUXrdcdoYHp9R8hn79MvXvvA/exec";
 
 /* ═══ Icons ═══ */
 const I={
@@ -131,15 +132,24 @@ function WaveDecoration(){
 }
 
 /* ═══ Card ═══ */
-function Card({item,index,isVisible,isDragging,onDragStart,onDragEnter,onDragEnd}){
+function Card({item,index,isVisible,isDragging,onDragStart,onDragEnter,onDragEnd,onChangeUser,allUsers:au}){
   const[h,setH]=useState(false);
   const[mp,setMp]=useState({x:50,y:50});
   const[pressed,setPressed]=useState(false);
+  const[showPicker,setShowPicker]=useState(false);
   const ref=useRef(null);
+  const pickerRef=useRef(null);
   const{add,R}=useRipple();
   const Ico=item.icon;
   const un=!item.user;
   const userColor=item.user?uc(item.user):"#CBD5E1";
+
+  useEffect(()=>{
+    if(!showPicker)return;
+    const close=(e)=>{if(pickerRef.current&&!pickerRef.current.contains(e.target))setShowPicker(false)};
+    document.addEventListener("mousedown",close);
+    return()=>document.removeEventListener("mousedown",close);
+  },[showPicker]);
 
   return(
     <div ref={ref}
@@ -156,10 +166,10 @@ function Card({item,index,isVisible,isDragging,onDragStart,onDragEnter,onDragEnd
         opacity:isVisible?(isDragging?0.9:(un?0.65:1)):0,
         transform:isVisible?(isDragging?"scale(1.02) rotate(0.5deg)":(pressed?"scale(0.985)":(h?"translateY(-3px)":"translateY(0)"))):"translateY(24px) scale(0.98)",
         transition:isDragging?"box-shadow 0.2s":(pressed?"transform 0.1s":"all 0.55s cubic-bezier(0.34,1.56,0.64,1) "+(index*0.06)+"s"),
-        cursor:"default",overflow:"hidden",zIndex:isDragging?100:1,
+        cursor:"default",zIndex:isDragging?100:1,
       }}
     >
-      <R/>
+      <div style={{position:"absolute",inset:0,borderRadius:18,overflow:"hidden",pointerEvents:"none"}}><R/></div>
       {!un&&!isDragging&&<div style={{position:"absolute",inset:0,borderRadius:18,opacity:h?0.06:0,background:"radial-gradient(450px circle at "+mp.x+"% "+mp.y+"%, "+item.color+", transparent 60%)",transition:"opacity 0.4s",pointerEvents:"none"}}/>}
 
       <div style={{position:"relative",zIndex:1,display:"flex",alignItems:"flex-start",gap:8}}>
@@ -188,15 +198,64 @@ function Card({item,index,isVisible,isDragging,onDragStart,onDragEnter,onDragEnd
             <span style={{fontWeight:500,color:un?"#94A3B8":"#475569"}}>{item.brand}</span>
             <span style={{margin:"0 6px",color:"#E2E8F0"}}>·</span>{item.specs}
           </p>
-          <div style={{display:"flex",alignItems:"center",gap:7}}>
+          <div style={{display:"flex",alignItems:"center",gap:7,position:"relative"}}>
             <span style={{fontSize:11,color:un?"#CBD5E1":"#94A3B8"}}>{item.finish}</span>
-            {item.user?(
-              <span style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:10,fontWeight:600,color:userColor,background:userColor+"0A",padding:"2px 8px 2px 5px",borderRadius:99,border:"1px solid "+userColor+"15"}}>
-                <I.User s={8} c={userColor}/>{item.user}
-              </span>
-            ):(
-              <span style={{fontSize:10,fontWeight:500,color:"#94A3B8",background:"#F8FAFC",padding:"2px 8px",borderRadius:99,border:"1px dashed #E2E8F0"}}>未使用</span>
-            )}
+            <div ref={pickerRef} style={{position:"relative"}}>
+              {item.user?(
+                <button onClick={(e)=>{e.stopPropagation();setShowPicker(!showPicker)}} style={{
+                  display:"inline-flex",alignItems:"center",gap:3,fontSize:10,fontWeight:600,color:userColor,
+                  background:userColor+"0A",padding:"2px 8px 2px 5px",borderRadius:99,
+                  border:"1px solid "+userColor+"15",cursor:"pointer",transition:"all 0.2s",
+                }}
+                  onMouseEnter={e=>{e.currentTarget.style.background=userColor+"15"}}
+                  onMouseLeave={e=>{e.currentTarget.style.background=userColor+"0A"}}
+                ><I.User s={8} c={userColor}/>{item.user}<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke={userColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:2}}><path d="m6 9 6 6 6-6"/></svg></button>
+              ):(
+                <button onClick={(e)=>{e.stopPropagation();setShowPicker(!showPicker)}} style={{
+                  fontSize:10,fontWeight:500,color:"#94A3B8",background:"#F8FAFC",
+                  padding:"2px 8px",borderRadius:99,border:"1px dashed #E2E8F0",
+                  cursor:"pointer",transition:"all 0.2s",display:"inline-flex",alignItems:"center",gap:3,
+                }}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor="#93C5FD";e.currentTarget.style.color="#3B82F6"}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#E2E8F0";e.currentTarget.style.color="#94A3B8"}}
+                >未使用<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:1}}><path d="m6 9 6 6 6-6"/></svg></button>
+              )}
+              {showPicker&&(
+                <div style={{
+                  position:"absolute",bottom:"calc(100% + 6px)",left:0,
+                  background:"#FFFFFF",borderRadius:12,padding:"6px",
+                  boxShadow:"0 8px 30px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
+                  border:"1px solid rgba(59,130,246,0.1)",
+                  minWidth:160,zIndex:200,animation:"fadeSlideUp 0.15s ease",
+                }}>
+                  <p style={{fontSize:9,fontWeight:600,color:"#94A3B8",letterSpacing:"0.06em",padding:"4px 8px 6px",textTransform:"uppercase"}}>使用者を変更</p>
+                  {au&&au.map(name=>{
+                    const c=uc(name);const isA=item.user===name;
+                    return(
+                      <button key={name} onClick={()=>{onChangeUser(item.id,name);setShowPicker(false)}}
+                        style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",borderRadius:8,border:"none",background:isA?"rgba(59,130,246,0.06)":"transparent",cursor:"pointer",transition:"all 0.15s",textAlign:"left"}}
+                        onMouseEnter={e=>{if(!isA)e.currentTarget.style.background="rgba(0,0,0,0.025)"}}
+                        onMouseLeave={e=>{if(!isA)e.currentTarget.style.background=isA?"rgba(59,130,246,0.06)":"transparent"}}
+                      >
+                        <div style={{width:22,height:22,borderRadius:6,background:c+"15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:600,color:c}}>{name.charAt(0)}</div>
+                        <span style={{fontSize:12,fontWeight:isA?600:400,color:isA?"#1E293B":"#64748B"}}>{name}</span>
+                        {isA&&<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><path d="M20 6 9 17l-5-5"/></svg>}
+                      </button>
+                    );
+                  })}
+                  <div style={{height:1,background:"#F1F5F9",margin:"4px 0"}}/>
+                  <button onClick={()=>{onChangeUser(item.id,null);setShowPicker(false)}}
+                    style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",borderRadius:8,border:"none",background:un?"rgba(245,158,11,0.06)":"transparent",cursor:"pointer",transition:"all 0.15s",textAlign:"left"}}
+                    onMouseEnter={e=>{if(!un)e.currentTarget.style.background="rgba(0,0,0,0.025)"}}
+                    onMouseLeave={e=>{if(!un)e.currentTarget.style.background=un?"rgba(245,158,11,0.06)":"transparent"}}
+                  >
+                    <div style={{width:22,height:22,borderRadius:6,background:"#FEF3C7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#D97706"}}>—</div>
+                    <span style={{fontSize:12,fontWeight:un?600:400,color:un?"#D97706":"#64748B"}}>未使用にする</span>
+                    {un&&<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><path d="M20 6 9 17l-5-5"/></svg>}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -291,7 +350,19 @@ function App(){
 
   useEffect(()=>{fetchData()},[fetchData]);
 
+  const handleChangeUser=(id,newUser)=>{
+    setItems(prev=>prev.map(d=>d.id===id?{...d,user:newUser}:d));
+    fetch(API_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain"},body:JSON.stringify({id:id,user:newUser||""})}).catch(()=>{});
+  };
+
   const allUsers=useMemo(()=>Array.from(new Set(items.filter(e=>e.user).map(e=>e.user))),[items]);
+  useEffect(()=>{
+    setMemberOrder(prev=>{
+      const valid=prev.filter(u=>allUsers.includes(u));
+      const newU=allUsers.filter(u=>!prev.includes(u));
+      return newU.length||valid.length!==prev.length?[...valid,...newU]:prev;
+    });
+  },[allUsers]);
   const unusedCnt=useMemo(()=>items.filter(e=>!e.user).length,[items]);
   const mCounts=useMemo(()=>{const m={};allUsers.forEach(u=>{m[u]=items.filter(e=>e.user===u).length});return m},[items,allUsers]);
   const orderedData=useMemo(()=>dataOrder.map(id=>items.find(d=>d.id===id)).filter(Boolean),[dataOrder,items]);
@@ -457,6 +528,8 @@ function App(){
                   onDragStart={e=>handleDragStart(e,item.id)}
                   onDragEnter={()=>handleDragEnter(item.id)}
                   onDragEnd={handleDragEnd}
+                  onChangeUser={handleChangeUser}
+                  allUsers={allUsers}
                 />
               </React.Fragment>
             ))}
