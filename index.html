@@ -111,15 +111,24 @@ function WaveDecoration(){
 }
 
 /* ═══ Card ═══ */
-function Card({item,index,isVisible,isDragging,dragStyle,onDragStart,onDragEnter,onDragEnd}){
+function Card({item,index,isVisible,isDragging,dragStyle,onDragStart,onDragEnter,onDragEnd,onChangeUser,allUsers:au}){
   const[h,setH]=useState(false);
   const[mp,setMp]=useState({x:50,y:50});
   const[pressed,setPressed]=useState(false);
+  const[showPicker,setShowPicker]=useState(false);
   const ref=useRef(null);
+  const pickerRef=useRef(null);
   const{add,R}=useRipple();
   const Ico=icoMap[item.icon];
   const un=!item.user;
   const userColor=item.user?uc(item.user):"#CBD5E1";
+
+  useEffect(()=>{
+    if(!showPicker)return;
+    const close=(e)=>{if(pickerRef.current&&!pickerRef.current.contains(e.target))setShowPicker(false)};
+    document.addEventListener("mousedown",close);
+    return()=>document.removeEventListener("mousedown",close);
+  },[showPicker]);
 
   return(
     <div ref={ref}
@@ -192,18 +201,79 @@ function Card({item,index,isVisible,isDragging,dragStyle,onDragStart,onDragEnter
             <span style={{fontWeight:500,color:un?"#94A3B8":"#475569"}}>{item.brand}</span>
             <span style={{margin:"0 6px",color:"#E2E8F0"}}>·</span>{item.sub}
           </p>
-          <div style={{display:"flex",alignItems:"center",gap:7}}>
+          <div style={{display:"flex",alignItems:"center",gap:7,position:"relative"}}>
             <span style={{fontSize:11,color:un?"#CBD5E1":"#94A3B8"}}>{item.finish}</span>
-            {item.user?(
-              <span style={{
-                display:"inline-flex",alignItems:"center",gap:3,
-                fontSize:10,fontWeight:600,color:userColor,
-                background:userColor+"0A",padding:"2px 8px 2px 5px",borderRadius:99,
-                border:"1px solid "+userColor+"15",
-              }}><I.User s={8} c={userColor}/>{item.user}</span>
-            ):(
-              <span style={{fontSize:10,fontWeight:500,color:"#94A3B8",background:"#F8FAFC",padding:"2px 8px",borderRadius:99,border:"1px dashed #E2E8F0"}}>未使用</span>
-            )}
+            {/* Clickable user badge */}
+            <div ref={pickerRef} style={{position:"relative"}}>
+              {item.user?(
+                <button onClick={(e)=>{e.stopPropagation();setShowPicker(!showPicker)}} style={{
+                  display:"inline-flex",alignItems:"center",gap:3,
+                  fontSize:10,fontWeight:600,color:userColor,
+                  background:userColor+"0A",padding:"2px 8px 2px 5px",borderRadius:99,
+                  border:"1px solid "+userColor+"15",cursor:"pointer",
+                  transition:"all 0.2s",
+                }}
+                  onMouseEnter={e=>{e.currentTarget.style.background=userColor+"15"}}
+                  onMouseLeave={e=>{e.currentTarget.style.background=userColor+"0A"}}
+                ><I.User s={8} c={userColor}/>{item.user}<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke={userColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:2}}><path d="m6 9 6 6 6-6"/></svg></button>
+              ):(
+                <button onClick={(e)=>{e.stopPropagation();setShowPicker(!showPicker)}} style={{
+                  fontSize:10,fontWeight:500,color:"#94A3B8",background:"#F8FAFC",
+                  padding:"2px 8px",borderRadius:99,border:"1px dashed #E2E8F0",
+                  cursor:"pointer",transition:"all 0.2s",display:"inline-flex",alignItems:"center",gap:3,
+                }}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor="#93C5FD";e.currentTarget.style.color="#3B82F6"}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#E2E8F0";e.currentTarget.style.color="#94A3B8"}}
+                >未使用<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:1}}><path d="m6 9 6 6 6-6"/></svg></button>
+              )}
+              {/* Dropdown */}
+              {showPicker&&(
+                <div style={{
+                  position:"absolute",bottom:"calc(100% + 6px)",left:0,
+                  background:"#FFFFFF",borderRadius:12,padding:"6px",
+                  boxShadow:"0 8px 30px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.05)",
+                  border:"1px solid rgba(59,130,246,0.1)",
+                  minWidth:140,zIndex:200,
+                  animation:"fadeSlideUp 0.15s ease",
+                }}>
+                  <p style={{fontSize:9,fontWeight:600,color:"#CBD5E1",letterSpacing:"0.06em",padding:"4px 8px 6px",textTransform:"uppercase"}}>使用者を変更</p>
+                  {au.map(name=>{
+                    const c=uc(name);const isActive=item.user===name;
+                    return(
+                      <button key={name} onClick={()=>{onChangeUser(item.id,name);setShowPicker(false)}}
+                        style={{
+                          display:"flex",alignItems:"center",gap:8,width:"100%",
+                          padding:"7px 10px",borderRadius:8,border:"none",
+                          background:isActive?"rgba(59,130,246,0.06)":"transparent",
+                          cursor:"pointer",transition:"all 0.15s",textAlign:"left",
+                        }}
+                        onMouseEnter={e=>{if(!isActive)e.currentTarget.style.background="rgba(0,0,0,0.025)"}}
+                        onMouseLeave={e=>{if(!isActive)e.currentTarget.style.background="transparent"}}
+                      >
+                        <div style={{width:22,height:22,borderRadius:6,background:c+"15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:600,color:c}}>{name.charAt(0)}</div>
+                        <span style={{fontSize:12,fontWeight:isActive?600:400,color:isActive?"#1E293B":"#64748B"}}>{name}</span>
+                        {isActive&&<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><path d="M20 6 9 17l-5-5"/></svg>}
+                      </button>
+                    );
+                  })}
+                  <div style={{height:1,background:"#F1F5F9",margin:"4px 0"}}/>
+                  <button onClick={()=>{onChangeUser(item.id,null);setShowPicker(false)}}
+                    style={{
+                      display:"flex",alignItems:"center",gap:8,width:"100%",
+                      padding:"7px 10px",borderRadius:8,border:"none",
+                      background:un?"rgba(245,158,11,0.06)":"transparent",
+                      cursor:"pointer",transition:"all 0.15s",textAlign:"left",
+                    }}
+                    onMouseEnter={e=>{if(!un)e.currentTarget.style.background="rgba(0,0,0,0.025)"}}
+                    onMouseLeave={e=>{if(!un)e.currentTarget.style.background=un?"rgba(245,158,11,0.06)":"transparent"}}
+                  >
+                    <div style={{width:22,height:22,borderRadius:6,background:"#FEF3C7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#D97706"}}>—</div>
+                    <span style={{fontSize:12,fontWeight:un?600:400,color:un?"#D97706":"#64748B"}}>未使用にする</span>
+                    {un&&<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><path d="M20 6 9 17l-5-5"/></svg>}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -304,6 +374,7 @@ function SbMember({name,count,active,onClick,isDragging,onDragStart,onDragEnter,
 
 /* ═══ App ═══ */
 function App(){
+  const[items,setItems]=useState(initData);
   const[dataOrder,setDataOrder]=useState(initData.map(d=>d.id));
   const[memberOrder,setMemberOrder]=useState([...users]);
   const[selUser,setSelUser]=useState(null);
@@ -316,9 +387,26 @@ function App(){
   const[dragOverMem,setDragOverMem]=useState(null);
 
   useEffect(()=>{setTimeout(()=>setLoaded(true),200)},[]);
+  useEffect(()=>{
+    setMemberOrder(prev=>{
+      const newUsers=allUserNames.filter(u=>!prev.includes(u));
+      const validPrev=prev.filter(u=>allUserNames.includes(u));
+      return newUsers.length>0?[...validPrev,...newUsers]:validPrev.length!==prev.length?validPrev:prev;
+    });
+  },[allUserNames]);
 
-  const orderedData=useMemo(()=>dataOrder.map(id=>initData.find(d=>d.id===id)).filter(Boolean),[dataOrder]);
-  const mCounts=useMemo(()=>{const m={};users.forEach(u=>{m[u]=initData.filter(e=>e.user===u).length});return m},[]);
+  const handleChangeUser=(id,newUser)=>{
+    setItems(prev=>prev.map(d=>d.id===id?{...d,user:newUser}:d));
+  };
+
+  const allUserNames=useMemo(()=>{
+    const fromItems=items.filter(e=>e.user).map(e=>e.user);
+    return Array.from(new Set([...users,...fromItems]));
+  },[items]);
+
+  const orderedData=useMemo(()=>dataOrder.map(id=>items.find(d=>d.id===id)).filter(Boolean),[dataOrder,items]);
+  const mCounts=useMemo(()=>{const m={};allUserNames.forEach(u=>{m[u]=items.filter(e=>e.user===u).length});return m},[items,allUserNames]);
+  const unusedCnt=useMemo(()=>items.filter(e=>!e.user).length,[items]);
 
   let filtered=orderedData;
   if(selUser)filtered=filtered.filter(e=>e.user===selUser);
@@ -327,9 +415,9 @@ function App(){
   if(statF==="未使用")filtered=filtered.filter(e=>!e.user);
 
   const catCounts=useMemo(()=>{
-    const base=selUser?initData.filter(e=>e.user===selUser):initData;
+    const base=selUser?items.filter(e=>e.user===selUser):items;
     const c={};cats.forEach(cat=>{c[cat]=cat==="すべて"?base.length:base.filter(e=>e.category===cat).length});return c;
-  },[selUser]);
+  },[selUser,items]);
 
   /* Card drag */
   const handleDragStart=(e,id)=>{setDragId(id);e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",String(id))};
@@ -358,10 +446,10 @@ function App(){
   /* Reset */
   const catOrder=cats.slice(1);
   const resetCardOrder=()=>{
-    const sorted=[...initData].sort((a,b)=>catOrder.indexOf(a.category)-catOrder.indexOf(b.category));
+    const sorted=[...items].sort((a,b)=>catOrder.indexOf(a.category)-catOrder.indexOf(b.category));
     setDataOrder(sorted.map(d=>d.id));
   };
-  const resetMemberOrder=()=>{setMemberOrder([...users].sort((a,b)=>a.localeCompare(b,'ja')))};
+  const resetMemberOrder=()=>{setMemberOrder([...allUserNames].sort((a,b)=>a.localeCompare(b,'ja')))};
 
   /* Drop indicator component */
   const DropLine=()=>(
@@ -387,20 +475,16 @@ function App(){
             <div style={{animation:"gentleSway 4s ease-in-out infinite"}}><I.Anchor s={20} c="#3B82F6"/></div>
             <h1 style={{fontSize:22,fontWeight:800,color:"#1E293B",letterSpacing:"-0.03em"}}>OCEANS</h1>
           </div>
-          <p style={{fontSize:11,color:"#94A3B8",fontWeight:400,letterSpacing:"0.03em",paddingLeft:2}}>備品管理</p>
+          <p style={{fontSize:11,color:"#475569",fontWeight:400,letterSpacing:"0.03em",paddingLeft:2}}>備品管理</p>
         </div>
 
         <div style={{flex:1,overflow:"auto",paddingBottom:12}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 12px",marginBottom:8}}>
-            <p style={{fontSize:10,fontWeight:600,color:"#CBD5E1",letterSpacing:"0.08em",textTransform:"uppercase"}}>メンバー</p>
-            <button onClick={resetMemberOrder} style={{fontSize:9.5,color:"#94A3B8",background:"none",border:"none",cursor:"pointer",padding:"2px 6px",borderRadius:4,transition:"all 0.2s"}}
-              onMouseEnter={e=>{e.currentTarget.style.color="#3B82F6"}}
-              onMouseLeave={e=>{e.currentTarget.style.color="#94A3B8"}}
-            >整理</button>
+          <div style={{padding:"0 12px",marginBottom:8}}>
+            <p style={{fontSize:10,fontWeight:600,color:"#64748B",letterSpacing:"0.08em",textTransform:"uppercase"}}>メンバー</p>
           </div>
           <div className="sb-members" style={{display:"flex",flexDirection:"column",gap:2}}
             onDragOver={e=>{e.preventDefault();e.dataTransfer.dropEffect="move"}} onDrop={handleMemberDrop}>
-            <SbMember name="全員" count={initData.length} active={!selUser} onClick={()=>setSelUser(null)}/>
+            <SbMember name="全員" count={items.length} active={!selUser} onClick={()=>setSelUser(null)}/>
             {memberOrder.map(name=>(
               <React.Fragment key={name}>
                 {dragMember&&dragOverMem===name&&dragMember!==name&&<DropLine/>}
@@ -412,19 +496,19 @@ function App(){
               </React.Fragment>
             ))}
           </div>
-          {unusedN>0&&(
+          {unusedCnt>0&&(
             <div style={{margin:"16px 4px 0"}}>
               <button onClick={()=>{setSelUser(null);setStatF(statF==="未使用"?"すべて":"未使用")}}
                 style={{width:"100%",padding:"10px 14px",borderRadius:12,border:statF==="未使用"?"1px solid rgba(245,158,11,0.15)":"1px solid rgba(0,0,0,0.03)",background:statF==="未使用"?"rgba(245,158,11,0.08)":"rgba(0,0,0,0.015)",cursor:"pointer",transition:"all 0.25s",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span style={{fontSize:12,fontWeight:500,color:statF==="未使用"?"#D97706":"#94A3B8"}}>未使用の備品</span>
-                <span style={{fontSize:12,fontWeight:700,color:statF==="未使用"?"#D97706":"#CBD5E1"}}>{unusedN}</span>
+                <span style={{fontSize:12,fontWeight:700,color:statF==="未使用"?"#D97706":"#CBD5E1"}}>{unusedCnt}</span>
               </button>
             </div>
           )}
         </div>
 
         <div style={{position:"relative",zIndex:2,padding:"12px 12px 16px",borderTop:"1px solid rgba(59,130,246,0.06)",display:"flex",flexDirection:"column",gap:5,marginBottom:8}}>
-          {[["合計",initData.length],["メンバー",users.length],["更新","2026.04.14"]].map(([k,v])=>(
+          {[["合計",items.length],["メンバー",allUserNames.length],["更新","2026.04.14"]].map(([k,v])=>(
             <div key={k} style={{display:"flex",justifyContent:"space-between"}}>
               <span style={{fontSize:10.5,color:"#334155"}}>{k}</span>
               <span style={{fontSize:10.5,fontWeight:600,color:"#1E293B"}}>{v}</span>
@@ -448,7 +532,7 @@ function App(){
               {selUser?selUser+" の備品":"すべての備品"}
             </h2>
             <p style={{fontSize:13,color:"#94A3B8",fontWeight:400}}>
-              {selUser?(mCounts[selUser]+" アイテム"):(initData.length+" アイテム · "+users.length+" メンバー")}
+              {selUser?(mCounts[selUser]+" アイテム"):(items.length+" アイテム · "+allUserNames.length+" メンバー")}
             </p>
           </div>
 
@@ -482,6 +566,8 @@ function App(){
                   onDragStart={e=>handleDragStart(e,item.id)}
                   onDragEnter={()=>handleDragEnter(item.id)}
                   onDragEnd={handleDragEnd}
+                  onChangeUser={handleChangeUser}
+                  allUsers={allUserNames}
                 />
               </React.Fragment>
             ))}
