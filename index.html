@@ -22,10 +22,10 @@
     @keyframes rippleOut{0%{transform:scale(0);opacity:0.5}100%{transform:scale(4);opacity:0}}
     @keyframes fadeSlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
     @keyframes gentleSway{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(1deg)}}
+    @keyframes spin{to{transform:rotate(360deg)}}
 
     .ripple-container{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none}
     .ripple{position:absolute;border-radius:50%;background:rgba(59,130,246,0.12);animation:rippleOut 0.6s ease-out forwards;width:80px;height:80px;margin:-40px}
-
     .drag-handle{cursor:grab;opacity:0.25;transition:opacity 0.2s,transform 0.2s}
     .drag-handle:hover{opacity:0.5;transform:scale(1.15)}
     .drag-handle:active{cursor:grabbing}
@@ -43,6 +43,10 @@
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
 
+const SHEET_ID="1QlTsEjnTNp1ucQKxt3i2GwGrdWaPGoddEfJqCl4iqKg";
+const CSV_URL=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+const SHEET_EDIT_URL=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
+
 /* ═══ Icons ═══ */
 const I={
   Laptop:(p)=><svg width={p.s||22} height={p.s||22} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/></svg>,
@@ -51,42 +55,58 @@ const I={
   Mouse:(p)=><svg width={p.s||22} height={p.s||22} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="12" height="18" x="6" y="3" rx="6"/><path d="M12 7v4"/></svg>,
   Stand:(p)=><svg width={p.s||22} height={p.s||22} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="12" x="3" y="3" rx="2"/><path d="M12 15v4M8 19h8"/></svg>,
   Grip:(p)=><svg width={p.s||22} height={p.s||22} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/><circle cx="5" cy="19" r="1"/></svg>,
+  Box:(p)=><svg width={p.s||22} height={p.s||22} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></svg>,
   Arrow:(p)=><svg width={p.s||11} height={p.s||11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 7h10v10M7 17 17 7"/></svg>,
   Anchor:(p)=><svg width={p.s||18} height={p.s||18} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="3"/><line x1="12" x2="12" y1="8" y2="21"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/></svg>,
   User:(p)=><svg width={p.s||10} height={p.s||10} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
   Users:(p)=><svg width={p.s||13} height={p.s||13} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
   DragDots:(p)=><svg width={p.s||16} height={p.s||16} viewBox="0 0 24 24" fill={p.c||"#CBD5E1"} stroke="none"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>,
+  Sheet:(p)=><svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2M8 17h2M14 13h2M14 17h2"/></svg>,
+  Refresh:(p)=><svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke={p.c||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>,
 };
-const icoMap={Laptop:I.Laptop,Monitor:I.Monitor,Keyboard:I.Keyboard,Mouse:I.Mouse,Stand:I.Stand,Grip:I.Grip};
 
-/* ═══ Data ═══ */
-const initData=[
-  {id:1,name:"MacBook Pro M4",sub:'14" / 32GB / 1TB SSD',brand:"Apple",category:"PC",color:"#3B82F6",url:"https://amzn.asia/d/092PHwjt",icon:"Laptop",finish:"スペースブラック",user:"中植"},
-  {id:2,name:"S2722DC モニター",sub:'27" QHD / IPS / USB-C',brand:"Dell",category:"モニター",color:"#10B981",url:"https://amzn.asia/d/huZo4Am",icon:"Monitor",finish:"75Hz / スピーカー付",user:"中植"},
-  {id:3,name:"PCスタンド 回転式",sub:"360° / 折りたたみ / 無段階調整",brand:"EPN",category:"スタンド",color:"#F59E0B",url:"https://amzn.asia/d/01dfglW4",icon:"Stand",finish:"人間工学設計",user:"中植"},
-  {id:4,name:"MX KEYS mini",sub:"Bluetooth / 充電式 / 日本語配列",brand:"Logicool",category:"キーボード",color:"#EC4899",url:"https://amzn.asia/d/gRjAFMU",icon:"Keyboard",finish:"グラファイト",user:"中植"},
-  {id:5,name:"MX ERGO S",sub:"トラックボール / 静音 / BT",brand:"Logicool",category:"マウス",color:"#8B5CF6",url:"https://amzn.asia/d/fzFRgbs",icon:"Mouse",finish:"グラファイト",user:"中植"},
-  {id:6,name:"モニターアーム",sub:'13-32" / ガススプリング / VESA',brand:"—",category:"アーム",color:"#06B6D4",url:"https://amzn.asia/d/0wfmNV4",icon:"Grip",finish:"シングル",user:"中植"},
-];
+/* Category config */
+const catConfig={
+  "PC":{icon:I.Laptop,color:"#3B82F6"},
+  "モニター":{icon:I.Monitor,color:"#10B981"},
+  "スタンド":{icon:I.Stand,color:"#F59E0B"},
+  "キーボード":{icon:I.Keyboard,color:"#EC4899"},
+  "マウス":{icon:I.Mouse,color:"#8B5CF6"},
+  "アーム":{icon:I.Grip,color:"#06B6D4"},
+};
+const defaultCat={icon:I.Box,color:"#64748B"};
+function getCat(cat){return catConfig[cat]||defaultCat}
 
-const cats=["すべて",...Array.from(new Set(initData.map(e=>e.category)))];
-const users=Array.from(new Set(initData.filter(e=>e.user).map(e=>e.user)));
-const unusedN=initData.filter(e=>!e.user).length;
 const ucMap={"中植":"#3B82F6","畑山":"#10B981","田中":"#8B5CF6","山本":"#F59E0B","佐藤":"#EC4899","鈴木":"#06B6D4"};
-function uc(name){return ucMap[name]||"#3B82F6"}
+const ucColors=["#3B82F6","#10B981","#F59E0B","#EC4899","#8B5CF6","#06B6D4","#EF4444","#14B8A6"];
+function uc(name){return ucMap[name]||ucColors[Math.abs([...name].reduce((a,c)=>a+c.charCodeAt(0),0))%ucColors.length]}
+
+/* ═══ CSV Parser ═══ */
+function parseCSV(text){
+  const lines=[];let cur="";let inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(c==='"'){if(inQ&&text[i+1]==='"'){cur+='"';i++}else{inQ=!inQ}}
+    else if(c===','&&!inQ){lines.length===0?lines.push([cur]):lines[lines.length-1].push(cur);cur=""}
+    else if((c==='\n'||c==='\r')&&!inQ){if(cur||lines[lines.length-1]){if(lines.length===0)lines.push([cur]);else lines[lines.length-1].push(cur)}cur="";if(c==='\r'&&text[i+1]==='\n')i++;lines.push([])}
+    else{cur+=c}
+  }
+  if(cur&&lines.length>0)lines[lines.length-1].push(cur);
+  const rows=lines.filter(r=>r.length>1);
+  if(rows.length<2)return[];
+  const headers=rows[0].map(h=>h.trim());
+  return rows.slice(1).map((row,idx)=>{
+    const obj={};headers.forEach((h,i)=>{obj[h]=row[i]?row[i].trim():""});
+    const cat=getCat(obj.category);
+    return{id:parseInt(obj.id)||idx+1,name:obj.name||"",brand:obj.brand||"",category:obj.category||"",specs:obj.specs||"",finish:obj.finish||"",user:obj.user||null,url:obj.url||"",color:cat.color,icon:cat.icon};
+  });
+}
 
 /* ═══ Ripple ═══ */
 function useRipple(){
   const[rips,setRips]=useState([]);
-  const add=useCallback((e,el)=>{
-    const r=el.getBoundingClientRect();
-    const rip={x:e.clientX-r.left,y:e.clientY-r.top,id:Date.now()};
-    setRips(p=>[...p,rip]);
-    setTimeout(()=>setRips(p=>p.filter(r2=>r2.id!==rip.id)),600);
-  },[]);
-  const R=()=>React.createElement("div",{className:"ripple-container"},
-    rips.map(r=>React.createElement("div",{key:r.id,className:"ripple",style:{left:r.x,top:r.y}}))
-  );
+  const add=useCallback((e,el)=>{const r=el.getBoundingClientRect();const rip={x:e.clientX-r.left,y:e.clientY-r.top,id:Date.now()};setRips(p=>[...p,rip]);setTimeout(()=>setRips(p=>p.filter(r2=>r2.id!==rip.id)),600)},[]);
+  const R=()=>React.createElement("div",{className:"ripple-container"},rips.map(r=>React.createElement("div",{key:r.id,className:"ripple",style:{left:r.x,top:r.y}})));
   return{add,R};
 }
 
@@ -111,24 +131,15 @@ function WaveDecoration(){
 }
 
 /* ═══ Card ═══ */
-function Card({item,index,isVisible,isDragging,dragStyle,onDragStart,onDragEnter,onDragEnd,onChangeUser,allUsers:au}){
+function Card({item,index,isVisible,isDragging,onDragStart,onDragEnter,onDragEnd}){
   const[h,setH]=useState(false);
   const[mp,setMp]=useState({x:50,y:50});
   const[pressed,setPressed]=useState(false);
-  const[showPicker,setShowPicker]=useState(false);
   const ref=useRef(null);
-  const pickerRef=useRef(null);
   const{add,R}=useRipple();
-  const Ico=icoMap[item.icon];
+  const Ico=item.icon;
   const un=!item.user;
   const userColor=item.user?uc(item.user):"#CBD5E1";
-
-  useEffect(()=>{
-    if(!showPicker)return;
-    const close=(e)=>{if(pickerRef.current&&!pickerRef.current.contains(e.target))setShowPicker(false)};
-    document.addEventListener("mousedown",close);
-    return()=>document.removeEventListener("mousedown",close);
-  },[showPicker]);
 
   return(
     <div ref={ref}
@@ -136,7 +147,7 @@ function Card({item,index,isVisible,isDragging,dragStyle,onDragStart,onDragEnter
       onMouseEnter={()=>setH(true)} onMouseLeave={()=>{setH(false);setPressed(false)}}
       onMouseDown={e=>{if(!e.target.closest('.drag-handle')){setPressed(true);add(e,ref.current)}}}
       onMouseUp={()=>setPressed(false)}
-      onMouseMove={e=>{if(!ref.current)return;const r=ref.current.getBoundingClientRect();setMp({x:((e.clientX-r.left)/r.width)*100,y:((e.clientY-r.top)/r.height)*100});}}
+      onMouseMove={e=>{if(!ref.current)return;const r=ref.current.getBoundingClientRect();setMp({x:((e.clientX-r.left)/r.width)*100,y:((e.clientY-r.top)/r.height)*100})}}
       style={{
         position:"relative",borderRadius:18,padding:"22px 8px 22px 4px",
         background:isDragging?"rgba(219,234,254,0.9)":(un?(h?"rgba(255,255,255,0.65)":"rgba(255,255,255,0.4)"):(h?"#FFFFFF":"rgba(255,255,255,0.85)")),
@@ -145,35 +156,18 @@ function Card({item,index,isVisible,isDragging,dragStyle,onDragStart,onDragEnter
         opacity:isVisible?(isDragging?0.9:(un?0.65:1)):0,
         transform:isVisible?(isDragging?"scale(1.02) rotate(0.5deg)":(pressed?"scale(0.985)":(h?"translateY(-3px)":"translateY(0)"))):"translateY(24px) scale(0.98)",
         transition:isDragging?"box-shadow 0.2s":(pressed?"transform 0.1s":"all 0.55s cubic-bezier(0.34,1.56,0.64,1) "+(index*0.06)+"s"),
-        cursor:"default",overflow:"hidden",
-        zIndex:isDragging?100:1,
-        ...dragStyle,
+        cursor:"default",overflow:"hidden",zIndex:isDragging?100:1,
       }}
     >
       <R/>
-      {!un&&!isDragging&&<div style={{
-        position:"absolute",inset:0,borderRadius:18,opacity:h?0.06:0,
-        background:"radial-gradient(450px circle at "+mp.x+"% "+mp.y+"%, "+item.color+", transparent 60%)",
-        transition:"opacity 0.4s",pointerEvents:"none",
-      }}/>}
+      {!un&&!isDragging&&<div style={{position:"absolute",inset:0,borderRadius:18,opacity:h?0.06:0,background:"radial-gradient(450px circle at "+mp.x+"% "+mp.y+"%, "+item.color+", transparent 60%)",transition:"opacity 0.4s",pointerEvents:"none"}}/>}
 
       <div style={{position:"relative",zIndex:1,display:"flex",alignItems:"flex-start",gap:8}}>
-        {/* Drag Handle */}
-        <div className="drag-handle"
-          draggable
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-          style={{
-            display:"flex",alignItems:"center",justifyContent:"center",
-            width:24,minHeight:46,flexShrink:0,
-            alignSelf:"center",
-            touchAction:"none",
-          }}
-        >
+        <div className="drag-handle" draggable onDragStart={onDragStart} onDragEnd={onDragEnd}
+          style={{display:"flex",alignItems:"center",justifyContent:"center",width:24,minHeight:46,flexShrink:0,alignSelf:"center",touchAction:"none"}}>
           <I.DragDots s={14} c={isDragging?"#3B82F6":"#CBD5E1"}/>
         </div>
 
-        {/* Icon */}
         <div style={{
           width:46,height:46,borderRadius:13,flexShrink:0,
           background:un?"#F8FAFC":"linear-gradient(135deg,"+item.color+"10,"+item.color+"05)",
@@ -185,110 +179,33 @@ function Card({item,index,isVisible,isDragging,dragStyle,onDragStart,onDragEnter
           <Ico s={20} c={un?"#CBD5E1":item.color} style={{opacity:un?0.4:(h?1:0.65),transition:"all 0.3s"}}/>
         </div>
 
-        {/* Content */}
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
             <span style={{fontSize:15.5,fontWeight:600,color:un?"#94A3B8":"#1E293B",letterSpacing:"-0.02em"}}>{item.name}</span>
-            <span style={{
-              fontSize:9.5,fontWeight:600,letterSpacing:"0.04em",
-              color:un?"#94A3B8":item.color,
-              background:un?"#F1F5F9":(item.color+"0C"),
-              padding:"2px 8px",borderRadius:99,
-              border:"1px solid "+(un?"#E2E8F0":(item.color+"18")),
-            }}>{item.category}</span>
+            <span style={{fontSize:9.5,fontWeight:600,letterSpacing:"0.04em",color:un?"#94A3B8":item.color,background:un?"#F1F5F9":(item.color+"0C"),padding:"2px 8px",borderRadius:99,border:"1px solid "+(un?"#E2E8F0":(item.color+"18"))}}>{item.category}</span>
           </div>
           <p style={{fontSize:12.5,color:un?"#CBD5E1":"#64748B",margin:"0 0 3px",lineHeight:1.5}}>
             <span style={{fontWeight:500,color:un?"#94A3B8":"#475569"}}>{item.brand}</span>
-            <span style={{margin:"0 6px",color:"#E2E8F0"}}>·</span>{item.sub}
+            <span style={{margin:"0 6px",color:"#E2E8F0"}}>·</span>{item.specs}
           </p>
-          <div style={{display:"flex",alignItems:"center",gap:7,position:"relative"}}>
+          <div style={{display:"flex",alignItems:"center",gap:7}}>
             <span style={{fontSize:11,color:un?"#CBD5E1":"#94A3B8"}}>{item.finish}</span>
-            {/* Clickable user badge */}
-            <div ref={pickerRef} style={{position:"relative"}}>
-              {item.user?(
-                <button onClick={(e)=>{e.stopPropagation();setShowPicker(!showPicker)}} style={{
-                  display:"inline-flex",alignItems:"center",gap:3,
-                  fontSize:10,fontWeight:600,color:userColor,
-                  background:userColor+"0A",padding:"2px 8px 2px 5px",borderRadius:99,
-                  border:"1px solid "+userColor+"15",cursor:"pointer",
-                  transition:"all 0.2s",
-                }}
-                  onMouseEnter={e=>{e.currentTarget.style.background=userColor+"15"}}
-                  onMouseLeave={e=>{e.currentTarget.style.background=userColor+"0A"}}
-                ><I.User s={8} c={userColor}/>{item.user}<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke={userColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:2}}><path d="m6 9 6 6 6-6"/></svg></button>
-              ):(
-                <button onClick={(e)=>{e.stopPropagation();setShowPicker(!showPicker)}} style={{
-                  fontSize:10,fontWeight:500,color:"#94A3B8",background:"#F8FAFC",
-                  padding:"2px 8px",borderRadius:99,border:"1px dashed #E2E8F0",
-                  cursor:"pointer",transition:"all 0.2s",display:"inline-flex",alignItems:"center",gap:3,
-                }}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor="#93C5FD";e.currentTarget.style.color="#3B82F6"}}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#E2E8F0";e.currentTarget.style.color="#94A3B8"}}
-                >未使用<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:1}}><path d="m6 9 6 6 6-6"/></svg></button>
-              )}
-              {/* Dropdown */}
-              {showPicker&&(
-                <div style={{
-                  position:"absolute",bottom:"calc(100% + 6px)",left:0,
-                  background:"#FFFFFF",borderRadius:12,padding:"6px",
-                  boxShadow:"0 8px 30px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.05)",
-                  border:"1px solid rgba(59,130,246,0.1)",
-                  minWidth:140,zIndex:200,
-                  animation:"fadeSlideUp 0.15s ease",
-                }}>
-                  <p style={{fontSize:9,fontWeight:600,color:"#CBD5E1",letterSpacing:"0.06em",padding:"4px 8px 6px",textTransform:"uppercase"}}>使用者を変更</p>
-                  {au.map(name=>{
-                    const c=uc(name);const isActive=item.user===name;
-                    return(
-                      <button key={name} onClick={()=>{onChangeUser(item.id,name);setShowPicker(false)}}
-                        style={{
-                          display:"flex",alignItems:"center",gap:8,width:"100%",
-                          padding:"7px 10px",borderRadius:8,border:"none",
-                          background:isActive?"rgba(59,130,246,0.06)":"transparent",
-                          cursor:"pointer",transition:"all 0.15s",textAlign:"left",
-                        }}
-                        onMouseEnter={e=>{if(!isActive)e.currentTarget.style.background="rgba(0,0,0,0.025)"}}
-                        onMouseLeave={e=>{if(!isActive)e.currentTarget.style.background="transparent"}}
-                      >
-                        <div style={{width:22,height:22,borderRadius:6,background:c+"15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:600,color:c}}>{name.charAt(0)}</div>
-                        <span style={{fontSize:12,fontWeight:isActive?600:400,color:isActive?"#1E293B":"#64748B"}}>{name}</span>
-                        {isActive&&<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><path d="M20 6 9 17l-5-5"/></svg>}
-                      </button>
-                    );
-                  })}
-                  <div style={{height:1,background:"#F1F5F9",margin:"4px 0"}}/>
-                  <button onClick={()=>{onChangeUser(item.id,null);setShowPicker(false)}}
-                    style={{
-                      display:"flex",alignItems:"center",gap:8,width:"100%",
-                      padding:"7px 10px",borderRadius:8,border:"none",
-                      background:un?"rgba(245,158,11,0.06)":"transparent",
-                      cursor:"pointer",transition:"all 0.15s",textAlign:"left",
-                    }}
-                    onMouseEnter={e=>{if(!un)e.currentTarget.style.background="rgba(0,0,0,0.025)"}}
-                    onMouseLeave={e=>{if(!un)e.currentTarget.style.background=un?"rgba(245,158,11,0.06)":"transparent"}}
-                  >
-                    <div style={{width:22,height:22,borderRadius:6,background:"#FEF3C7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#D97706"}}>—</div>
-                    <span style={{fontSize:12,fontWeight:un?600:400,color:un?"#D97706":"#64748B"}}>未使用にする</span>
-                    {un&&<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><path d="M20 6 9 17l-5-5"/></svg>}
-                  </button>
-                </div>
-              )}
-            </div>
+            {item.user?(
+              <span style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:10,fontWeight:600,color:userColor,background:userColor+"0A",padding:"2px 8px 2px 5px",borderRadius:99,border:"1px solid "+userColor+"15"}}>
+                <I.User s={8} c={userColor}/>{item.user}
+              </span>
+            ):(
+              <span style={{fontSize:10,fontWeight:500,color:"#94A3B8",background:"#F8FAFC",padding:"2px 8px",borderRadius:99,border:"1px dashed #E2E8F0"}}>未使用</span>
+            )}
           </div>
         </div>
 
-        {/* Amazon */}
-        <a href={item.url} target="_blank" rel="noopener noreferrer"
+        {item.url&&<a href={item.url} target="_blank" rel="noopener noreferrer"
           onClick={e=>isDragging&&e.preventDefault()}
-          style={{
-            display:"flex",alignItems:"center",gap:3,fontSize:11,fontWeight:500,
-            color:h?"#3B82F6":"#C0C8D4",padding:"6px 10px",borderRadius:9,
-            background:h?"rgba(59,130,246,0.06)":"transparent",
-            transition:"all 0.3s",flexShrink:0,marginTop:2,
-          }}
-          onMouseEnter={e=>{e.currentTarget.style.background="rgba(59,130,246,0.1)";e.currentTarget.style.color="#2563EB";e.currentTarget.style.transform="translateX(2px)";}}
-          onMouseLeave={e=>{e.currentTarget.style.background=h?"rgba(59,130,246,0.06)":"transparent";e.currentTarget.style.color=h?"#3B82F6":"#C0C8D4";e.currentTarget.style.transform="translateX(0)";}}
-        >Amazon<I.Arrow/></a>
+          style={{display:"flex",alignItems:"center",gap:3,fontSize:11,fontWeight:500,color:h?"#3B82F6":"#C0C8D4",padding:"6px 10px",borderRadius:9,background:h?"rgba(59,130,246,0.06)":"transparent",transition:"all 0.3s",flexShrink:0,marginTop:2}}
+          onMouseEnter={e=>{e.currentTarget.style.background="rgba(59,130,246,0.1)";e.currentTarget.style.color="#2563EB";e.currentTarget.style.transform="translateX(2px)"}}
+          onMouseLeave={e=>{e.currentTarget.style.background=h?"rgba(59,130,246,0.06)":"transparent";e.currentTarget.style.color=h?"#3B82F6":"#C0C8D4";e.currentTarget.style.transform="translateX(0)"}}
+        >Amazon<I.Arrow/></a>}
       </div>
     </div>
   );
@@ -297,74 +214,38 @@ function Card({item,index,isVisible,isDragging,dragStyle,onDragStart,onDragEnter
 /* ═══ Pill ═══ */
 function Pill({label,active,onClick,count}){
   const[h,setH]=useState(false);
-  const[clicked,setClicked]=useState(false);
+  const[cl,setCl]=useState(false);
   return(
-    <button onClick={()=>{setClicked(true);setTimeout(()=>setClicked(false),200);onClick()}}
+    <button onClick={()=>{setCl(true);setTimeout(()=>setCl(false),200);onClick()}}
       onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
-      style={{
-        padding:"6px 14px",borderRadius:99,
-        border:active?"1px solid rgba(59,130,246,0.25)":"1px solid transparent",
-        background:active?"#3B82F6":h?"rgba(59,130,246,0.06)":"transparent",
-        color:active?"#FFF":h?"#3B82F6":"#64748B",
-        fontSize:12,fontWeight:active?600:400,
-        transition:clicked?"transform 0.1s":"all 0.3s cubic-bezier(0.34,1.56,0.64,1)",
-        whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:4,
-        transform:clicked?"scale(0.92)":"scale(1)",
-      }}
+      style={{padding:"6px 14px",borderRadius:99,border:active?"1px solid rgba(59,130,246,0.25)":"1px solid transparent",background:active?"#3B82F6":h?"rgba(59,130,246,0.06)":"transparent",color:active?"#FFF":h?"#3B82F6":"#64748B",fontSize:12,fontWeight:active?600:400,transition:cl?"transform 0.1s":"all 0.3s cubic-bezier(0.34,1.56,0.64,1)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:4,transform:cl?"scale(0.92)":"scale(1)"}}
     >
       {label}
-      {count!==undefined&&count>0&&(
-        <span style={{fontSize:9,fontWeight:600,background:active?"rgba(255,255,255,0.25)":"rgba(59,130,246,0.08)",color:active?"#FFF":"#64748B",padding:"1px 5px",borderRadius:99,minWidth:16,textAlign:"center"}}>{count}</span>
-      )}
+      {count!==undefined&&count>0&&<span style={{fontSize:9,fontWeight:600,background:active?"rgba(255,255,255,0.25)":"rgba(59,130,246,0.08)",color:active?"#FFF":"#64748B",padding:"1px 5px",borderRadius:99,minWidth:16,textAlign:"center"}}>{count}</span>}
     </button>
   );
 }
 
 /* ═══ SbMember ═══ */
-function SbMember({name,count,active,onClick,isDragging,onDragStart,onDragEnter,draggable}){
+function SbMember({name,count,active,onClick,isDragging,onDragStart,onDragEnter,draggable:canDrag}){
   const[h,setH]=useState(false);
   const[cl,setCl]=useState(false);
-  const colors=["#3B82F6","#10B981","#F59E0B","#EC4899","#8B5CF6","#06B6D4","#EF4444","#14B8A6"];
-  const c=colors[Math.abs([...name].reduce((a,ch)=>a+ch.charCodeAt(0),0))%colors.length];
   const isAll=name==="全員";
+  const c=isAll?"#3B82F6":uc(name);
   return(
-    <div
-      onDragEnter={onDragEnter}
-      style={{
-        display:"flex",alignItems:"center",width:"100%",
-        borderRadius:12,
-        opacity:isDragging?0.5:1,
-        background:isDragging?"rgba(59,130,246,0.06)":(active?"rgba(59,130,246,0.06)":h?"rgba(0,0,0,0.02)":"transparent"),
-        transition:cl?"transform 0.1s":"all 0.25s ease",
-        transform:cl?"scale(0.96)":"scale(1)",
-      }}
-    >
-      {/* Drag handle for non-全員 */}
-      {!isAll&&draggable?(
-        <div draggable onDragStart={onDragStart}
-          className="drag-handle"
-          style={{display:"flex",alignItems:"center",justifyContent:"center",width:20,flexShrink:0,padding:"8px 0 8px 6px",alignSelf:"stretch",cursor:"grab"}}>
+    <div onDragEnter={onDragEnter}
+      style={{display:"flex",alignItems:"center",width:"100%",borderRadius:12,opacity:isDragging?0.5:1,background:isDragging?"rgba(59,130,246,0.06)":(active?"rgba(59,130,246,0.06)":h?"rgba(0,0,0,0.02)":"transparent"),transition:cl?"transform 0.1s":"all 0.25s ease",transform:cl?"scale(0.96)":"scale(1)"}}>
+      {!isAll&&canDrag?(
+        <div draggable onDragStart={onDragStart} className="drag-handle" style={{display:"flex",alignItems:"center",justifyContent:"center",width:20,flexShrink:0,padding:"8px 0 8px 6px",alignSelf:"stretch",cursor:"grab"}}>
           <I.DragDots s={10} c={isDragging?"#3B82F6":"#D4D4D8"}/>
         </div>
-      ):(
-        <div style={{width:8,flexShrink:0}}/>
-      )}
+      ):(<div style={{width:8,flexShrink:0}}/>)}
       <button onClick={()=>{setCl(true);setTimeout(()=>setCl(false),200);onClick()}}
         onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
-        style={{
-          display:"flex",alignItems:"center",gap:10,flex:1,
-          padding:isAll?"9px 12px 9px 4px":"9px 12px 9px 4px",border:"none",
-          background:"transparent",textAlign:"left",cursor:"pointer",
-        }}
-      >
-        <div style={{
-          width:32,height:32,borderRadius:9,flexShrink:0,
-          background:active?(c+"18"):(h?(c+"0C"):(c+"08")),
-          display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize:13,fontWeight:600,color:active?c:(h?c+"CC":c+"88"),
-          transition:"all 0.3s cubic-bezier(0.34,1.56,0.64,1)",
-          transform:h?"scale(1.08)":"scale(1)",
-        }}>{isAll?<I.Users s={14} c={active?"#3B82F6":"#94A3B8"}/>:name.charAt(0)}</div>
+        style={{display:"flex",alignItems:"center",gap:10,flex:1,padding:"9px 12px 9px 4px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer"}}>
+        <div style={{width:32,height:32,borderRadius:9,flexShrink:0,background:active?(c+"18"):(h?(c+"0C"):(c+"08")),display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:600,color:active?c:(h?c+"CC":c+"88"),transition:"all 0.3s cubic-bezier(0.34,1.56,0.64,1)",transform:h?"scale(1.08)":"scale(1)"}}>
+          {isAll?<I.Users s={14} c={active?"#3B82F6":"#94A3B8"}/>:name.charAt(0)}
+        </div>
         <span style={{flex:1,fontSize:13,fontWeight:active?600:400,color:active?"#1E293B":h?"#475569":"#94A3B8",transition:"all 0.25s"}}>{name}</span>
         <span style={{fontSize:11,fontWeight:500,color:active?"#3B82F6":"#CBD5E1"}}>{count}</span>
       </button>
@@ -374,9 +255,11 @@ function SbMember({name,count,active,onClick,isDragging,onDragStart,onDragEnter,
 
 /* ═══ App ═══ */
 function App(){
-  const[items,setItems]=useState(initData);
-  const[dataOrder,setDataOrder]=useState(initData.map(d=>d.id));
-  const[memberOrder,setMemberOrder]=useState([...users]);
+  const[items,setItems]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[error,setError]=useState(null);
+  const[dataOrder,setDataOrder]=useState([]);
+  const[memberOrder,setMemberOrder]=useState([]);
   const[selUser,setSelUser]=useState(null);
   const[catF,setCatF]=useState("すべて");
   const[statF,setStatF]=useState("すべて");
@@ -385,28 +268,34 @@ function App(){
   const[dragOverItem,setDragOverItem]=useState(null);
   const[dragMember,setDragMember]=useState(null);
   const[dragOverMem,setDragOverMem]=useState(null);
+  const[refreshing,setRefreshing]=useState(false);
 
-  useEffect(()=>{setTimeout(()=>setLoaded(true),200)},[]);
-  useEffect(()=>{
-    setMemberOrder(prev=>{
-      const newUsers=allUserNames.filter(u=>!prev.includes(u));
-      const validPrev=prev.filter(u=>allUserNames.includes(u));
-      return newUsers.length>0?[...validPrev,...newUsers]:validPrev.length!==prev.length?validPrev:prev;
-    });
-  },[allUserNames]);
+  const fetchData=useCallback(()=>{
+    setRefreshing(true);
+    const primary=CSV_URL;
+    const fallback=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
+    const tryFetch=(url)=>fetch(url,{redirect:'follow'}).then(r=>{if(!r.ok)throw new Error(r.status);return r.text()});
+    tryFetch(primary).catch(()=>tryFetch(fallback))
+      .then(text=>{
+        const parsed=parseCSV(text);
+        if(parsed.length===0)throw new Error("empty");
+        setItems(parsed);
+        setDataOrder(parsed.map(d=>d.id));
+        const u=Array.from(new Set(parsed.filter(e=>e.user).map(e=>e.user)));
+        setMemberOrder(prev=>prev.length?prev.filter(m=>u.includes(m)).concat(u.filter(m=>!prev.includes(m))):u);
+        setLoading(false);setError(null);setRefreshing(false);
+        setTimeout(()=>setLoaded(true),200);
+      })
+      .catch(e=>{setError("データの取得に失敗しました。スプレッドシートの共有設定を確認してください。");setLoading(false);setRefreshing(false)});
+  },[]);
 
-  const handleChangeUser=(id,newUser)=>{
-    setItems(prev=>prev.map(d=>d.id===id?{...d,user:newUser}:d));
-  };
+  useEffect(()=>{fetchData()},[fetchData]);
 
-  const allUserNames=useMemo(()=>{
-    const fromItems=items.filter(e=>e.user).map(e=>e.user);
-    return Array.from(new Set([...users,...fromItems]));
-  },[items]);
-
-  const orderedData=useMemo(()=>dataOrder.map(id=>items.find(d=>d.id===id)).filter(Boolean),[dataOrder,items]);
-  const mCounts=useMemo(()=>{const m={};allUserNames.forEach(u=>{m[u]=items.filter(e=>e.user===u).length});return m},[items,allUserNames]);
+  const allUsers=useMemo(()=>Array.from(new Set(items.filter(e=>e.user).map(e=>e.user))),[items]);
   const unusedCnt=useMemo(()=>items.filter(e=>!e.user).length,[items]);
+  const mCounts=useMemo(()=>{const m={};allUsers.forEach(u=>{m[u]=items.filter(e=>e.user===u).length});return m},[items,allUsers]);
+  const orderedData=useMemo(()=>dataOrder.map(id=>items.find(d=>d.id===id)).filter(Boolean),[dataOrder,items]);
+  const cats=useMemo(()=>["すべて",...Array.from(new Set(items.map(e=>e.category).filter(Boolean)))],[items]);
 
   let filtered=orderedData;
   if(selUser)filtered=filtered.filter(e=>e.user===selUser);
@@ -417,59 +306,52 @@ function App(){
   const catCounts=useMemo(()=>{
     const base=selUser?items.filter(e=>e.user===selUser):items;
     const c={};cats.forEach(cat=>{c[cat]=cat==="すべて"?base.length:base.filter(e=>e.category===cat).length});return c;
-  },[selUser,items]);
+  },[selUser,items,cats]);
 
-  /* Card drag */
   const handleDragStart=(e,id)=>{setDragId(id);e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",String(id))};
   const handleDragEnter=(id)=>{if(id!==dragId)setDragOverItem(id)};
   const handleDragOver=(e)=>{e.preventDefault();e.dataTransfer.dropEffect="move"};
   const handleDrop=(e)=>{
     e.preventDefault();
     if(dragId!==null&&dragOverItem!==null&&dragId!==dragOverItem){
-      setDataOrder(prev=>{const arr=[...prev];const fi=arr.indexOf(dragId);const ti=arr.indexOf(dragOverItem);arr.splice(fi,1);const newTi=fi<ti?ti-1:ti;arr.splice(newTi,0,dragId);return arr});
+      setDataOrder(prev=>{const arr=[...prev];const fi=arr.indexOf(dragId);const ti=arr.indexOf(dragOverItem);arr.splice(fi,1);const nt=fi<ti?ti-1:ti;arr.splice(nt,0,dragId);return arr});
     }
     setDragId(null);setDragOverItem(null);
   };
   const handleDragEnd=()=>{setDragId(null);setDragOverItem(null);setDragMember(null);setDragOverMem(null)};
-
-  /* Member drag */
   const handleMemberDragStart=(e,name)=>{setDragMember(name);e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain","m:"+name)};
   const handleMemberDragEnter=(name)=>{if(name!==dragMember)setDragOverMem(name)};
   const handleMemberDrop=(e)=>{
     e.preventDefault();
     if(dragMember&&dragOverMem&&dragMember!==dragOverMem){
-      setMemberOrder(prev=>{const arr=[...prev];const fi=arr.indexOf(dragMember);const ti=arr.indexOf(dragOverMem);arr.splice(fi,1);const newTi=fi<ti?ti-1:ti;arr.splice(newTi,0,dragMember);return arr});
+      setMemberOrder(prev=>{const arr=[...prev];const fi=arr.indexOf(dragMember);const ti=arr.indexOf(dragOverMem);arr.splice(fi,1);const nt=fi<ti?ti-1:ti;arr.splice(nt,0,dragMember);return arr});
     }
     setDragMember(null);setDragOverMem(null);
   };
 
-  /* Reset */
   const catOrder=cats.slice(1);
-  const resetCardOrder=()=>{
-    const sorted=[...items].sort((a,b)=>catOrder.indexOf(a.category)-catOrder.indexOf(b.category));
-    setDataOrder(sorted.map(d=>d.id));
-  };
-  const resetMemberOrder=()=>{setMemberOrder([...allUserNames].sort((a,b)=>a.localeCompare(b,'ja')))};
+  const resetCardOrder=()=>{const sorted=[...items].sort((a,b)=>catOrder.indexOf(a.category)-catOrder.indexOf(b.category));setDataOrder(sorted.map(d=>d.id))};
 
-  /* Drop indicator component */
-  const DropLine=()=>(
-    <div style={{height:3,borderRadius:2,background:"linear-gradient(90deg,transparent,#3B82F6,#3B82F6,transparent)",margin:"2px 0",animation:"fadeSlideUp 0.15s ease",boxShadow:"0 0 8px rgba(59,130,246,0.3)"}}/>
+  const DropLine=()=>(<div style={{height:3,borderRadius:2,background:"linear-gradient(90deg,transparent,#3B82F6,#3B82F6,transparent)",margin:"2px 0",animation:"fadeSlideUp 0.15s ease",boxShadow:"0 0 8px rgba(59,130,246,0.3)"}}/>);
+
+  if(loading)return(
+    <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"linear-gradient(180deg,#F0F6FF,#E8F1FE)",gap:16}}>
+      <div style={{width:40,height:40,border:"3px solid #DBEAFE",borderTopColor:"#3B82F6",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+      <p style={{color:"#94A3B8",fontSize:14}}>データを読み込み中...</p>
+    </div>
+  );
+
+  if(error)return(
+    <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"linear-gradient(180deg,#F0F6FF,#E8F1FE)",gap:12}}>
+      <p style={{color:"#EF4444",fontSize:14}}>{error}</p>
+      <button onClick={fetchData} style={{padding:"8px 20px",borderRadius:10,border:"1px solid #3B82F6",background:"rgba(59,130,246,0.06)",color:"#3B82F6",fontSize:13,fontWeight:500}}>再試行</button>
+    </div>
   );
 
   return(
     <div className="app-layout" style={{display:"flex",height:"100vh",overflow:"hidden",background:"linear-gradient(180deg,#F0F6FF 0%,#E8F1FE 40%,#F0F4FA 100%)"}}>
 
-      {/* ═══ Sidebar ═══ */}
-      <aside className="sidebar" style={{
-        width:250,height:"100vh",position:"relative",
-        background:"rgba(255,255,255,0.7)",
-        backdropFilter:"blur(30px)",WebkitBackdropFilter:"blur(30px)",
-        borderRight:"1px solid rgba(59,130,246,0.08)",
-        display:"flex",flexDirection:"column",padding:"24px 14px 0",flexShrink:0,
-        opacity:loaded?1:0,transform:loaded?"translateX(0)":"translateX(-20px)",
-        transition:"all 0.7s cubic-bezier(0.34,1.56,0.64,1)",
-        overflow:"hidden",
-      }}>
+      <aside className="sidebar" style={{width:250,height:"100vh",position:"relative",background:"rgba(255,255,255,0.7)",backdropFilter:"blur(30px)",WebkitBackdropFilter:"blur(30px)",borderRight:"1px solid rgba(59,130,246,0.08)",display:"flex",flexDirection:"column",padding:"24px 14px 0",flexShrink:0,opacity:loaded?1:0,transform:loaded?"translateX(0)":"translateX(-20px)",transition:"all 0.7s cubic-bezier(0.34,1.56,0.64,1)",overflow:"hidden"}}>
         <div style={{padding:"0 10px 20px",borderBottom:"1px solid rgba(59,130,246,0.06)",marginBottom:16}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
             <div style={{animation:"gentleSway 4s ease-in-out infinite"}}><I.Anchor s={20} c="#3B82F6"/></div>
@@ -488,7 +370,7 @@ function App(){
             {memberOrder.map(name=>(
               <React.Fragment key={name}>
                 {dragMember&&dragOverMem===name&&dragMember!==name&&<DropLine/>}
-                <SbMember name={name} count={mCounts[name]} active={selUser===name} onClick={()=>setSelUser(name)}
+                <SbMember name={name} count={mCounts[name]||0} active={selUser===name} onClick={()=>setSelUser(name)}
                   draggable isDragging={dragMember===name}
                   onDragStart={e=>handleMemberDragStart(e,name)}
                   onDragEnter={()=>handleMemberDragEnter(name)}
@@ -505,10 +387,22 @@ function App(){
               </button>
             </div>
           )}
+
+          {/* Edit in Sheets */}
+          <div style={{margin:"16px 4px 0"}}>
+            <a href={SHEET_EDIT_URL} target="_blank" rel="noopener noreferrer"
+              style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",borderRadius:12,border:"1px solid rgba(59,130,246,0.1)",background:"rgba(59,130,246,0.03)",transition:"all 0.25s",cursor:"pointer"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(59,130,246,0.08)"}}
+              onMouseLeave={e=>{e.currentTarget.style.background="rgba(59,130,246,0.03)"}}
+            >
+              <I.Sheet s={14} c="#3B82F6"/>
+              <span style={{fontSize:12,fontWeight:500,color:"#3B82F6"}}>スプレッドシートで編集</span>
+            </a>
+          </div>
         </div>
 
         <div style={{position:"relative",zIndex:2,padding:"12px 12px 16px",borderTop:"1px solid rgba(59,130,246,0.06)",display:"flex",flexDirection:"column",gap:5,marginBottom:8}}>
-          {[["合計",items.length],["メンバー",allUserNames.length],["更新","2026.04.14"]].map(([k,v])=>(
+          {[["合計",items.length],["メンバー",allUsers.length],["更新","自動"]].map(([k,v])=>(
             <div key={k} style={{display:"flex",justifyContent:"space-between"}}>
               <span style={{fontSize:10.5,color:"#334155"}}>{k}</span>
               <span style={{fontSize:10.5,fontWeight:600,color:"#1E293B"}}>{v}</span>
@@ -518,30 +412,19 @@ function App(){
         <WaveDecoration/>
       </aside>
 
-      {/* ═══ Main ═══ */}
-      <main className="main-content" style={{flex:1,height:"100vh",overflowY:"auto",overflowX:"hidden",position:"relative"}}
-        onDragOver={handleDragOver} onDrop={handleDrop}
-      >
+      <main className="main-content" style={{flex:1,height:"100vh",overflowY:"auto",overflowX:"hidden",position:"relative"}} onDragOver={handleDragOver} onDrop={handleDrop}>
         <div style={{maxWidth:720,margin:"0 auto",padding:"0 32px"}}>
-          <div style={{
-            paddingTop:48,paddingBottom:4,
-            opacity:loaded?1:0,transform:loaded?"translateY(0)":"translateY(16px)",
-            transition:"all 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.1s",
-          }}>
+          <div style={{paddingTop:48,paddingBottom:4,opacity:loaded?1:0,transform:loaded?"translateY(0)":"translateY(16px)",transition:"all 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.1s"}}>
             <h2 style={{fontSize:34,fontWeight:700,color:"#1E293B",letterSpacing:"-0.03em",margin:"0 0 4px",lineHeight:1.15}}>
               {selUser?selUser+" の備品":"すべての備品"}
             </h2>
             <p style={{fontSize:13,color:"#94A3B8",fontWeight:400}}>
-              {selUser?(mCounts[selUser]+" アイテム"):(items.length+" アイテム · "+allUserNames.length+" メンバー")}
+              {selUser?((mCounts[selUser]||0)+" アイテム"):(items.length+" アイテム · "+allUsers.length+" メンバー")}
             </p>
           </div>
 
-          <div style={{
-            display:"flex",flexWrap:"wrap",gap:8,margin:"20px 0 16px",
-            opacity:loaded?1:0,transform:loaded?"translateY(0)":"translateY(10px)",
-            transition:"all 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.2s",
-          }}>
-            <div className="filter-bar" style={{display:"flex",gap:2,padding:"3px",background:"rgba(255,255,255,0.7)",backdropFilter:"blur(20px)",borderRadius:99,border:"1px solid rgba(59,130,246,0.08)"}}>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,margin:"20px 0 16px",opacity:loaded?1:0,transform:loaded?"translateY(0)":"translateY(10px)",transition:"all 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.2s"}}>
+            <div className="filter-bar" style={{display:"flex",gap:2,padding:"3px",background:"rgba(255,255,255,0.7)",backdropFilter:"blur(20px)",borderRadius:99,border:"1px solid rgba(59,130,246,0.08)",flexWrap:"wrap"}}>
               {cats.map(cat=>(<Pill key={cat} label={cat} active={catF===cat} count={cat==="すべて"?undefined:catCounts[cat]} onClick={()=>setCatF(cat)}/>))}
             </div>
             <div style={{display:"flex",gap:2,padding:"3px",background:"rgba(255,255,255,0.5)",borderRadius:99,border:"1px solid rgba(0,0,0,0.03)"}}>
@@ -550,11 +433,19 @@ function App(){
           </div>
 
           <div style={{fontSize:12,color:"#94A3B8",marginBottom:12,paddingLeft:2,opacity:loaded?1:0,transition:"opacity 0.5s 0.35s",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <span>{filtered.length} 件表示{dragId!==null&&" · ドラッグで並び替え中"}</span>
-            <button onClick={resetCardOrder} style={{fontSize:10.5,color:"#3B82F6",background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.15)",borderRadius:8,padding:"4px 12px",cursor:"pointer",transition:"all 0.2s"}}
-              onMouseEnter={e=>{e.currentTarget.style.background="rgba(59,130,246,0.12)";e.currentTarget.style.borderColor="rgba(59,130,246,0.25)"}}
-              onMouseLeave={e=>{e.currentTarget.style.background="rgba(59,130,246,0.06)";e.currentTarget.style.borderColor="rgba(59,130,246,0.15)"}}
-            >並び順を整理</button>
+            <span>{filtered.length} 件表示</span>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={()=>{fetchData()}} title="データを更新"
+                style={{display:"flex",alignItems:"center",gap:4,fontSize:10.5,color:"#3B82F6",background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.15)",borderRadius:8,padding:"4px 10px",cursor:"pointer",transition:"all 0.2s"}}
+                onMouseEnter={e=>{e.currentTarget.style.background="rgba(59,130,246,0.12)"}}
+                onMouseLeave={e=>{e.currentTarget.style.background="rgba(59,130,246,0.06)"}}
+              ><I.Refresh s={12} c="#3B82F6" style={refreshing?{animation:"spin 0.8s linear infinite"}:{}}/>{refreshing?"更新中...":"更新"}</button>
+              <button onClick={resetCardOrder}
+                style={{fontSize:10.5,color:"#3B82F6",background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.15)",borderRadius:8,padding:"4px 12px",cursor:"pointer",transition:"all 0.2s"}}
+                onMouseEnter={e=>{e.currentTarget.style.background="rgba(59,130,246,0.12)"}}
+                onMouseLeave={e=>{e.currentTarget.style.background="rgba(59,130,246,0.06)"}}
+              >並び順を整理</button>
+            </div>
           </div>
 
           <div style={{display:"flex",flexDirection:"column",gap:8,paddingBottom:60}}>
@@ -566,8 +457,6 @@ function App(){
                   onDragStart={e=>handleDragStart(e,item.id)}
                   onDragEnter={()=>handleDragEnter(item.id)}
                   onDragEnd={handleDragEnd}
-                  onChangeUser={handleChangeUser}
-                  allUsers={allUserNames}
                 />
               </React.Fragment>
             ))}
@@ -575,7 +464,6 @@ function App(){
               <div style={{textAlign:"center",padding:"80px 20px",color:"#CBD5E1",fontSize:14,animation:"fadeSlideUp 0.5s ease"}}>該当する備品がありません</div>
             )}
           </div>
-          <div onDragEnd={handleDragEnd} style={{position:"fixed",inset:0,zIndex:-1,pointerEvents:dragId?"auto":"none"}} onDragOver={handleDragOver}/>
         </div>
       </main>
     </div>
